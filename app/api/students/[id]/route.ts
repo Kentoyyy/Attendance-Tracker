@@ -47,4 +47,4 @@ export async function DELETE(req: NextRequest) {
     console.error(`Failed to delete student:`, error);
     return NextResponse.json({ message: 'Failed to delete student', error }, { status: 500 });
   }
-}
+} 
