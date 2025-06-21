@@ -1,0 +1,321 @@
+"use client"
+
+import React, { useState, useEffect } from 'react';
+import { Student, AttendanceRecord } from '../types';
+import { getDaysInMonth, format, startOfMonth, getDate, isToday, getDay } from 'date-fns';
+import { WarningNote } from './WarningNote';
+import { AbsenceNotesModal } from './AbsenceNotesModal';
+import { Button } from './ui/button';
+import { Trash2 } from 'lucide-react';
+
+interface StudentTableProps {
+  grade: number;
+  currentMonth: Date;
+}
+
+const getMonthDates = (month: Date) => {
+  const dayCount = getDaysInMonth(month);
+  const monthStart = startOfMonth(month);
+  return Array.from({ length: dayCount }, (_, i) => new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1));
+};
+
+export default function StudentTable({ grade, currentMonth }: StudentTableProps) {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendance, setAttendance] = useState<Record<string, AttendanceRecord[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [hoveredStudent, setHoveredStudent] = useState<Student | null>(null);
+  const [hoveredAbsences, setHoveredAbsences] = useState<AttendanceRecord[]>([]);
+  const [hoveredAbsenceInfo, setHoveredAbsenceInfo] = useState<{ reason: string; top: number; left: number } | null>(null);
+  const [hoveredWarningInfo, setHoveredWarningInfo] = useState<{ count: number; top: number; left: number; width: number; } | null>(null);
+  
+  const [isNoteModalOpen, setNoteModalOpen] = useState(false);
+  const [selectedStudentForNote, setSelectedStudentForNote] = useState<Student | null>(null);
+  const [selectedRecordForNote, setSelectedRecordForNote] = useState<AttendanceRecord | null>(null);
+
+  const dates = getMonthDates(currentMonth);
+
+  const fetchStudents = async () => {
+    try {
+      const response = await fetch(`/api/students?grade=${grade}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch students');
+      }
+      const data = await response.json();
+      setStudents(data);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      setStudents([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchAttendanceForStudents = async (studentList: Student[], month: Date) => {
+    const newAttendance: Record<string, AttendanceRecord[]> = {};
+    const monthStr = format(month, 'yyyy-MM');
+    
+    for (const student of studentList) {
+      try {
+        const res = await fetch(`/api/attendance?studentId=${student._id}&month=${monthStr}`);
+        newAttendance[student._id] = res.ok ? await res.json() : [];
+      } catch (error) {
+        console.error(`Failed to fetch attendance for ${student.name}`, error);
+        newAttendance[student._id] = [];
+      }
+    }
+    setAttendance(newAttendance);
+  };
+
+  useEffect(() => {
+    fetchStudents();
+  }, [grade]);
+
+  useEffect(() => {
+    if (students.length > 0) {
+      fetchAttendanceForStudents(students, currentMonth);
+    }
+  }, [students, currentMonth]);
+
+  const handleDayClick = (student: Student, date: Date, isCurrentlyAbsent: boolean) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+
+    if (isCurrentlyAbsent) {
+      // If student is absent, open the modal to edit the note.
+      const record = attendance[student._id]?.find(r => format(new Date(r.date), 'yyyy-MM-dd') === dateStr);
+      if (record) {
+        setSelectedStudentForNote(student);
+        setSelectedRecordForNote(record);
+        setNoteModalOpen(true);
+      }
+    } else {
+      // If student is present, open the modal to mark them as absent with a potential reason.
+      const newRecordTemplate = { _id: `new-${Date.now()}`, studentId: student._id, date: dateStr, isAbsent: true, reason: '' };
+      setSelectedStudentForNote(student);
+      setSelectedRecordForNote(newRecordTemplate);
+      setNoteModalOpen(true);
+    }
+  };
+
+  const handleDeleteStudent = async (studentId: string) => {
+    if (window.confirm('Are you sure you want to delete this student and all their records? This cannot be undone.')) {
+      try {
+        const res = await fetch(`/api/students/${studentId}`, { method: 'DELETE' });
+        if (res.ok) {
+          fetchStudents();
+        }
+      } catch (error) {
+        console.error('Error deleting student', error);
+      }
+    }
+  };
+  
+  const handleNoteSaved = (updatedRecord: AttendanceRecord) => {
+    setAttendance(prev => {
+      const studentRecords = prev[updatedRecord.studentId] ? [...prev[updatedRecord.studentId]] : [];
+      // Check if we are updating a temporary record or a real one.
+      const recordIndex = studentRecords.findIndex(r => r._id === updatedRecord._id || r._id.startsWith('new-'));
+      
+      if (recordIndex > -1) {
+        // If found, replace it with the new record from the server.
+        studentRecords[recordIndex] = updatedRecord;
+      } else {
+        // Otherwise, add the new record.
+        studentRecords.push(updatedRecord);
+      }
+      return { ...prev, [updatedRecord.studentId]: studentRecords };
+    });
+  };
+
+  const handleStudentHover = (student: Student) => {
+    setHoveredStudent(student);
+    const studentAbsences = attendance[student._id]?.filter(r => r.isAbsent) || [];
+    setHoveredAbsences(studentAbsences);
+  };
+
+  const handleStudentLeave = () => {
+    setHoveredStudent(null);
+    setHoveredAbsences([]);
+  };
+
+  const handleAbsenceHover = (e: React.MouseEvent, record: AttendanceRecord | undefined) => {
+    if (record?.isAbsent && record.reason) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setHoveredAbsenceInfo({
+        reason: record.reason,
+        top: rect.bottom,
+        left: rect.left,
+      });
+    }
+  };
+
+  const handleAbsenceLeave = () => {
+    setHoveredAbsenceInfo(null);
+  };
+
+  const handleAbsenceCountHover = (e: React.MouseEvent, count: number) => {
+    if (count >= 3) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setHoveredWarningInfo({
+        count: count,
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  };
+
+  const handleAbsenceCountLeave = () => {
+    setHoveredWarningInfo(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p className="text-gray-500">Loading students...</p>
+      </div>
+    );
+  }
+
+  if (students.length === 0) {
+    return (
+      <div className="text-center py-16 px-4">
+        <h3 className="text-lg font-medium text-gray-900">No Students Found</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Add a new student to this grade to get started.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full relative">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="sticky left-0 bg-gray-50 px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider z-10">
+                Name
+              </th>
+              {dates.map(date => (
+                <th key={date.toString()} scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div className="font-normal text-gray-400">{format(date, 'eee')}</div>
+                  <div>{getDate(date)}</div>
+                </th>
+              ))}
+              <th scope="col" className="sticky right-0 bg-gray-50 px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-l border-gray-200">
+                Absences
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {students.map(student => {
+              const studentAttendance = attendance[student._id] || [];
+              const absentCount = studentAttendance.filter(r => r.isAbsent).length;
+              
+              return (
+                <tr key={student._id}>
+                  <td className="sticky left-0 bg-white px-3 sm:px-6 py-4 whitespace-nowrap z-10">
+                    <div className="flex items-center">
+                      <div className="font-medium text-gray-900 text-sm sm:text-base">{student.name}</div>
+                      {student.gender && (
+                        <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}`}>
+                          {student.gender}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  {dates.map(date => {
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    const record = studentAttendance.find(r => format(new Date(r.date), 'yyyy-MM-dd') === dateStr);
+                    const isAbsent = record?.isAbsent || false;
+
+                    return (
+                      <td key={dateStr} className="px-2 py-2 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => handleDayClick(student, date, isAbsent)}
+                          onMouseEnter={(e) => isAbsent && handleAbsenceHover(e, record)}
+                          onMouseLeave={handleAbsenceLeave}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors duration-200
+                            ${isAbsent 
+                              ? 'bg-red-100 text-red-800 font-bold hover:bg-red-200' 
+                              : 'text-gray-500 hover:bg-gray-100'
+                            }`
+                          }
+                          aria-label={`Mark day ${getDate(date)} for ${student.name}`}
+                        >
+                          {getDate(date)}
+                        </button>
+                      </td>
+                    );
+                  })}
+                  <td className="sticky right-0 bg-white px-3 sm:px-6 py-4 whitespace-nowrap text-center border-l border-gray-200">
+                    <div 
+                      className="relative font-semibold text-lg text-gray-800 inline-block cursor-pointer"
+                      onMouseEnter={(e) => handleAbsenceCountHover(e, absentCount)}
+                      onMouseLeave={handleAbsenceCountLeave}
+                    >
+                      {absentCount}
+                      {absentCount >= 3 && (
+                        <span className={`absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-white ${
+                          absentCount >= 10 ? 'bg-red-500' : absentCount >= 5 ? 'bg-orange-400' : 'bg-yellow-400'
+                        }`}>
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Hover Tooltip for Absence Details */}
+      {hoveredStudent && hoveredAbsences.length > 0 && (
+        <div className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+          <h4 className="font-semibold text-gray-900 mb-2">{hoveredStudent.name}'s Absences</h4>
+          <div className="space-y-1">
+            {hoveredAbsences.map((absence, index) => (
+              <div key={index} className="text-sm text-gray-600">
+                <span className="font-medium">{format(new Date(absence.date), 'MMM dd, yyyy')}</span>
+                {absence.reason && (
+                  <span className="text-gray-500 ml-2">- {absence.reason}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hoveredAbsenceInfo && (
+        <div
+          className="fixed z-50 rounded-md bg-gray-900 px-2.5 py-1 text-xs font-medium text-white shadow-lg"
+          style={{ top: hoveredAbsenceInfo.top + 8, left: hoveredAbsenceInfo.left }}
+        >
+          {hoveredAbsenceInfo.reason}
+        </div>
+      )}
+
+      {hoveredWarningInfo && (
+        <div
+          className="fixed z-50"
+          style={{ 
+            top: hoveredWarningInfo.top + 8, 
+            left: hoveredWarningInfo.left + hoveredWarningInfo.width / 2,
+            transform: 'translateX(-50%)'
+          }}
+        >
+          <WarningNote absentCount={hoveredWarningInfo.count} />
+        </div>
+      )}
+
+      <AbsenceNotesModal 
+        isOpen={isNoteModalOpen}
+        onOpenChange={setNoteModalOpen}
+        student={selectedStudentForNote}
+        record={selectedRecordForNote}
+        onNoteSave={handleNoteSaved}
+      />
+    </div>
+  );
+} 
