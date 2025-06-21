@@ -4,6 +4,7 @@ import { useState } from 'react';
 import StudentTable from '../components/StudentTable';
 import GradeSelector from '../components/GradeSelector';
 import AddStudentModal from '../components/AddStudentModal';
+import OfflineStatus from '../components/OfflineStatus';
 import { Button } from '../components/ui/button';
 import { Plus, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import Link from 'next/link';
@@ -29,7 +30,7 @@ export default function Dashboard() {
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Teacher Mia Attendance System</h1>
-            <p className="text-gray-500">Manage your student's attendance.</p>
+            <p className="text-gray-500">Manage your student's attendance - Works offline!</p>
           </div>
           <div className="w-full md:w-auto flex flex-col md:flex-row items-stretch md:items-center gap-2">
             <Clock />
@@ -67,6 +68,7 @@ export default function Dashboard() {
       </main>
 
       <AddStudentModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} selectedGrade={selectedGrade} />
+      <OfflineStatus />
     </div>
   );
 } 
