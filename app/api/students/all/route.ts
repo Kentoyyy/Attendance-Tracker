@@ -10,7 +10,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user?.role !== 'admin') {
+  // Check if the user is an admin (assume role is stored in session.user as a custom property)
+  if (
+    !session ||
+    !session.user ||
+    (session.user as { role?: string }).role !== 'admin'
+  ) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 

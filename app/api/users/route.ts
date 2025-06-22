@@ -8,7 +8,12 @@ import { authOptions } from '@/app/lib/auth';
 // GET all users (or filter by role)
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.role !== 'admin') {
+  // Type assertion to allow access to 'role' property
+  if (
+    !session ||
+    !session.user ||
+    (session.user as { role?: string }).role !== 'admin'
+  ) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
@@ -35,7 +40,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
     // For now, allow admin to create. Later you could add a self-registration option.
-    if (!session || session.user?.role !== 'admin') {
+    // Type assertion to allow access to 'role' property
+    if (
+        !session ||
+        !session.user ||
+        (session.user as { role?: string }).role !== 'admin'
+    ) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
