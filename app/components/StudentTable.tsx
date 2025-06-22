@@ -9,8 +9,10 @@ import { Button } from './ui/button';
 import { Trash2 } from 'lucide-react';
 
 interface StudentTableProps {
-  grade: number;
+  students: Student[];
+  isLoading: boolean;
   currentMonth: Date;
+  onAttendanceUpdate?: () => void;
 }
 
 const getMonthDates = (month: Date) => {
@@ -19,10 +21,8 @@ const getMonthDates = (month: Date) => {
   return Array.from({ length: dayCount }, (_, i) => new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1));
 };
 
-export default function StudentTable({ grade, currentMonth }: StudentTableProps) {
-  const [students, setStudents] = useState<Student[]>([]);
+export default function StudentTable({ students, isLoading, currentMonth, onAttendanceUpdate }: StudentTableProps) {
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord[]>>({});
-  const [isLoading, setIsLoading] = useState(true);
   const [hoveredStudent, setHoveredStudent] = useState<Student | null>(null);
   const [hoveredAbsences, setHoveredAbsences] = useState<AttendanceRecord[]>([]);
   const [hoveredAbsenceInfo, setHoveredAbsenceInfo] = useState<{ reason: string; top: number; left: number } | null>(null);
@@ -33,22 +33,6 @@ export default function StudentTable({ grade, currentMonth }: StudentTableProps)
   const [selectedRecordForNote, setSelectedRecordForNote] = useState<AttendanceRecord | null>(null);
 
   const dates = getMonthDates(currentMonth);
-
-  const fetchStudents = async () => {
-    try {
-      const response = await fetch(`/api/students?grade=${grade}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch students');
-      }
-      const data = await response.json();
-      setStudents(data);
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      setStudents([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const fetchAttendanceForStudents = async (studentList: Student[], month: Date) => {
     const newAttendance: Record<string, AttendanceRecord[]> = {};
@@ -67,12 +51,10 @@ export default function StudentTable({ grade, currentMonth }: StudentTableProps)
   };
 
   useEffect(() => {
-    fetchStudents();
-  }, [grade]);
-
-  useEffect(() => {
     if (students.length > 0) {
       fetchAttendanceForStudents(students, currentMonth);
+    } else {
+      setAttendance({}); // Clear attendance if students list is empty
     }
   }, [students, currentMonth]);
 
@@ -101,7 +83,7 @@ export default function StudentTable({ grade, currentMonth }: StudentTableProps)
       try {
         const res = await fetch(`/api/students/${studentId}`, { method: 'DELETE' });
         if (res.ok) {
-          fetchStudents();
+          onAttendanceUpdate?.();
         }
       } catch (error) {
         console.error('Error deleting student', error);
@@ -112,18 +94,16 @@ export default function StudentTable({ grade, currentMonth }: StudentTableProps)
   const handleNoteSaved = (updatedRecord: AttendanceRecord) => {
     setAttendance(prev => {
       const studentRecords = prev[updatedRecord.studentId] ? [...prev[updatedRecord.studentId]] : [];
-      // Check if we are updating a temporary record or a real one.
-      const recordIndex = studentRecords.findIndex(r => r._id === updatedRecord._id || r._id.startsWith('new-'));
+      const recordIndex = studentRecords.findIndex(r => r._id === updatedRecord._id);
       
       if (recordIndex > -1) {
-        // If found, replace it with the new record from the server.
         studentRecords[recordIndex] = updatedRecord;
       } else {
-        // Otherwise, add the new record.
         studentRecords.push(updatedRecord);
       }
       return { ...prev, [updatedRecord.studentId]: studentRecords };
     });
+    onAttendanceUpdate?.();
   };
 
   const handleStudentHover = (student: Student) => {
@@ -196,12 +176,15 @@ export default function StudentTable({ grade, currentMonth }: StudentTableProps)
               <th scope="col" className="sticky left-0 bg-gray-50 px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider z-10">
                 Name
               </th>
-              {dates.map(date => (
-                <th key={date.toString()} scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <div className="font-normal text-gray-400">{format(date, 'eee')}</div>
-                  <div>{getDate(date)}</div>
-                </th>
-              ))}
+              {dates.map(date => {
+                const isCurrentDay = isToday(date);
+                return (
+                  <th key={date.toString()} scope="col" className={`px-2 py-3 text-center text-xs font-medium uppercase tracking-wider ${isCurrentDay ? 'bg-blue-100 text-blue-800' : 'text-gray-500'}`}>
+                    <div className={`font-normal ${isCurrentDay ? 'text-blue-600' : 'text-gray-400'}`}>{format(date, 'eee')}</div>
+                    <div className={`mt-1 font-semibold ${isCurrentDay ? 'bg-blue-600 text-white rounded-full h-6 w-6 flex items-center justify-center mx-auto' : ''}`}>{getDate(date)}</div>
+                  </th>
+                );
+              })}
               <th scope="col" className="sticky right-0 bg-gray-50 px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-l border-gray-200">
                 Absences
               </th>
@@ -228,9 +211,10 @@ export default function StudentTable({ grade, currentMonth }: StudentTableProps)
                     const dateStr = format(date, 'yyyy-MM-dd');
                     const record = studentAttendance.find(r => format(new Date(r.date), 'yyyy-MM-dd') === dateStr);
                     const isAbsent = record?.isAbsent || false;
+                    const isCurrentDay = isToday(date);
 
                     return (
-                      <td key={dateStr} className="px-2 py-2 whitespace-nowrap text-center">
+                      <td key={dateStr} className={`px-2 py-2 whitespace-nowrap text-center ${isCurrentDay ? 'bg-blue-50' : ''}`}>
                         <button
                           onClick={() => handleDayClick(student, date, isAbsent)}
                           onMouseEnter={(e) => isAbsent && handleAbsenceHover(e, record)}

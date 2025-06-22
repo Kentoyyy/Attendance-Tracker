@@ -16,10 +16,11 @@ import { Label } from "@/app/components/ui/label";
 interface AddStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onStudentAdded: () => void;
   selectedGrade?: number;
 }
 
-export default function AddStudentModal({ isOpen, onClose, selectedGrade = 1 }: AddStudentModalProps) {
+export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selectedGrade = 1 }: AddStudentModalProps) {
   const [name, setName] = useState('');
   const [gender, setGender] = useState('Female');
   const [isSaving, setIsSaving] = useState(false);
@@ -46,8 +47,7 @@ export default function AddStudentModal({ isOpen, onClose, selectedGrade = 1 }: 
       if (response.ok) {
         onClose();
         setName('');
-        // Refresh the page to show the new student
-        window.location.reload();
+        onStudentAdded();
       } else {
         console.error('Failed to add student');
       }

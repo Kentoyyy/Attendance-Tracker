@@ -1,0 +1,218 @@
+'use client';
+
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
+import { IUser } from '@/app/models/User';
+import { Student } from '@/app/models/Student';
+import TeacherStudentsModal from '../components/TeacherStudentsModal';
+
+// Augment the Student type to include the populated createdBy field
+interface PopulatedStudent extends Omit<Student, 'createdBy'> {
+  createdBy: {
+    _id: string;
+    name: string;
+  }
+}
+
+
+export default function AdminDashboard() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  const [teachers, setTeachers] = useState<IUser[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState({ teachers: true, students: true });
+  const [error, setError] = useState<string | null>(null);
+  
+  const [newTeacherName, setNewTeacherName] = useState('');
+  const [newTeacherEmail, setNewTeacherEmail] = useState('');
+  const [newTeacherPassword, setNewTeacherPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<{ _id: string; name: string } | null>(null);
+
+  const fetchTeachers = async () => {
+    setIsLoading(prev => ({ ...prev, teachers: true }));
+    try {
+      const teachersRes = await fetch('/api/users?role=teacher');
+      if (teachersRes.ok) {
+        const teachersData = await teachersRes.json();
+        setTeachers(teachersData);
+      }
+    } catch (e) {
+      console.error("Failed to fetch teachers", e);
+      setError('Failed to fetch teachers');
+    } finally {
+      setIsLoading(prev => ({ ...prev, teachers: false }));
+    }
+  };
+
+  useEffect(() => {
+    // Protect route for admin only
+    if (status === 'authenticated') {
+      // Use type guard to check for 'role' property
+      if (!isAdminUser(session.user) || session.user.role !== 'admin') {
+        router.replace('/dashboard');
+      } else {
+        fetchTeachers();
+      }
+    } else if (status === 'unauthenticated') {
+      router.replace('/login');
+    }
+  }, [status, session, router]);
+
+  const handleCreateTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitMessage('');
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTeacherName, email: newTeacherEmail, password: newTeacherPassword, role: 'teacher' }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setSubmitMessage(`Teacher account for ${data.name} created successfully!`);
+        setNewTeacherName('');
+        setNewTeacherEmail('');
+        setNewTeacherPassword('');
+        fetchTeachers(); // Refresh teachers list
+      } else {
+        setSubmitMessage(data.message || 'Failed to create teacher account.');
+      }
+    } catch (e) {
+      setSubmitMessage('An unexpected error occurred.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleViewStudents = (teacher: IUser) => {
+    setSelectedTeacher({ 
+      _id: typeof teacher._id === 'string' ? teacher._id : String(teacher._id), 
+      name: typeof teacher.name === 'string' ? teacher.name : String(teacher.name) 
+    });
+    setIsModalOpen(true);
+  };
+  function isAdminUser(user: unknown): user is { role: string } {
+    return typeof user === 'object' && user !== null && 'role' in user;
+  }
+
+  if (
+    status === 'loading' ||
+    !session ||
+    !isAdminUser(session.user) ||
+    session.user.role !== 'admin'
+  ) {
+    return <div className="flex items-center justify-center min-h-screen">Loading & Verifying Access...</div>;
+  }
+
+  return (
+    <div className="bg-white text-gray-900 min-h-screen">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-8 border-b border-gray-200">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admin Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">Welcome, {session.user?.name}. Manage teacher accounts.</p>
+          </div>
+          <div className="mt-4 sm:mt-0">
+            <Button onClick={() => signOut({ callbackUrl: '/' })} variant="outline" className="bg-white text-gray-800 border-gray-300 hover:bg-gray-100">Logout</Button>
+          </div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-5 gap-12">
+          {/* Left Column: Create Teacher Form */}
+          <div className="lg:col-span-2">
+            <h2 className="text-lg font-semibold text-gray-900">Create New Teacher</h2>
+            <p className="mt-1 text-sm text-gray-500">Add a new teacher account to the system.</p>
+            
+            <form onSubmit={handleCreateTeacher} className="mt-6 grid gap-y-6">
+              <div>
+                <Label htmlFor="name" className="text-sm font-medium text-gray-700">Full Name</Label>
+                <Input id="name" value={newTeacherName} onChange={e => setNewTeacherName(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" />
+              </div>
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email Address</Label>
+                <Input id="email" type="email" value={newTeacherEmail} onChange={e => setNewTeacherEmail(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" />
+              </div>
+              <div>
+                <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
+                <Input id="password" type="password" value={newTeacherPassword} onChange={e => setNewTeacherPassword(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" />
+              </div>
+              
+              {submitMessage && <p className={`text-sm ${submitMessage.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>{submitMessage}</p>}
+              
+              <Button type="submit" disabled={isSubmitting} className="w-full justify-center bg-gray-900 text-white hover:bg-gray-800">
+                {isSubmitting ? 'Creating Account...' : 'Create Account'}
+              </Button>
+            </form>
+          </div>
+
+          {/* Right Column: Teacher List */}
+          <div className="lg:col-span-3">
+            <h2 className="text-lg font-semibold text-gray-900">Teacher Accounts ({teachers.length})</h2>
+            <p className="mt-1 text-sm text-gray-500">List of all registered teacher accounts.</p>
+            
+            <div className="mt-6 flow-root">
+              <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                  <div className="overflow-hidden border border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                          <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {isLoading.teachers ? (
+                          <tr><td colSpan={3} className="text-center p-6 text-sm text-gray-500">Loading teachers...</td></tr>
+                        ) : teachers.length > 0 ? (
+                          teachers.map((teacher, idx) => (
+                            <tr key={typeof teacher._id === 'string' || typeof teacher._id === 'number' ? teacher._id : idx} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{teacher.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.email}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <Button
+                                  variant="link"
+                                  className="p-0 h-auto font-semibold text-gray-700 hover:text-black"
+                                  onClick={() => handleViewStudents(teacher)}
+                                >
+                                  View Students
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr><td colSpan={3} className="text-center p-6 text-sm text-gray-500">No teacher accounts found.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <TeacherStudentsModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        teacher={selectedTeacher}
+      />
+    </div>
+  );
+}

@@ -1,0 +1,33 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { connectToDatabase } from '@/app/lib/mongodb';
+import StudentModel from '@/app/models/Student';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session || session.user?.role !== 'admin') {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    await connectToDatabase();
+    
+    // Fetch all students and populate the 'createdBy' field with the teacher's name
+    const allStudents = await StudentModel.find({})
+      .populate({
+        path: 'createdBy',
+        select: 'name' // Only get the name of the teacher
+      })
+      .sort({ createdAt: -1 });
+    
+    return NextResponse.json(allStudents);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ message: 'Failed to fetch all students', error: errorMessage }, { status: 500 });
+  }
+} 

@@ -1,29 +1,12 @@
 "use client";
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Button } from "./components/ui/button";
+import { Button } from "../components/ui/button";
 import { ArrowRight } from "lucide-react";
-import LoginModal from './components/LoginModal';
+import LoginModal from '../components/LoginModal';
 
-export default function HomePage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [isNavigating, setIsNavigating] = useState(false);
+export default function LandingPage() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-
-  const handleCtaClick = () => {
-    if (status === 'authenticated') {
-      setIsNavigating(true);
-     
-      const userRole = (session.user as any)?.role;
-      const destination = userRole === 'admin' ? '/admin' : '/dashboard';
-      router.push(destination);
-    } else {
-      setIsLoginModalOpen(true);
-    }
-  };
 
   return (
     <>
@@ -39,13 +22,10 @@ export default function HomePage() {
             </p>
             <Button
               size="lg"
-              onClick={handleCtaClick}
-              disabled={isNavigating && status === 'authenticated'}
+              onClick={() => setIsLoginModalOpen(true)}
               className="cursor-pointer bg-gray-900 text-white hover:bg-gray-800"
             >
-              {status === 'authenticated'
-                ? (isNavigating ? "Entering..." : "Go to Dashboard")
-                : "Proceed to Login"}
+              Proceed to Login
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
@@ -66,4 +46,4 @@ export default function HomePage() {
       />
     </>
   );
-}
+} 

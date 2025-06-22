@@ -1,27 +1,39 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema, models } from 'mongoose';
 
 // Interface for the Student document
-export interface IStudent extends Document {
+export interface Student extends Document {
+  _id: string;
   name: string;
   grade: number;
-  gender: string;
+  gender: 'Male' | 'Female';
+  photoUrl?: string;
+  attendance?: any[]; // Simplified for this context
+  createdBy: mongoose.Schema.Types.ObjectId;
 }
 
 // Mongoose schema for the Student
-const StudentSchema: Schema<IStudent> = new Schema({
+const StudentSchema: Schema<Student> = new Schema({
   name: {
     type: String,
-    required: [true, 'Please provide a name for the student.'],
+    required: [true, 'Please provide a name for this student.'],
     trim: true,
   },
   grade: {
     type: Number,
-    required: [true, 'Please provide a grade for the student.'],
+    required: [true, 'Please provide a grade for this student.'],
   },
   gender: {
     type: String,
-    required: true,
+    required: [true, 'Please provide a gender.'],
     enum: ['Male', 'Female'],
+  },
+  photoUrl: {
+    type: String,
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
   },
 }, {
   timestamps: true, // Adds createdAt and updatedAt timestamps
@@ -29,6 +41,6 @@ const StudentSchema: Schema<IStudent> = new Schema({
 
 // Create and export the Student model
 // This checks if the model is already defined to prevent recompilation errors in development
-const Student: Model<IStudent> = mongoose.models.Student || mongoose.model<IStudent>('Student', StudentSchema);
+const StudentModel = (models.Student as Model<Student>) || mongoose.model<Student>('Student', StudentSchema);
 
-export default Student; 
+export default StudentModel; 
