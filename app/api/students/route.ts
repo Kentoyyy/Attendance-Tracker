@@ -3,7 +3,7 @@ import { connectToDatabase } from '@/app/lib/mongodb';
 import StudentModel from '@/app/models/Student';
 import Log from '@/app/models/Log';
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { authOptions } from "@/app/lib/auth"
 
 export const dynamic = 'force-dynamic';
 

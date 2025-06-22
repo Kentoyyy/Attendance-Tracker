@@ -3,7 +3,7 @@ import { connectToDatabase } from '@/app/lib/mongodb';
 import User from '@/app/models/User';
 import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '@/app/lib/auth';
 
 // GET all users (or filter by role)
 export async function GET(request: NextRequest) {
