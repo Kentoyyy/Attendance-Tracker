@@ -11,12 +11,12 @@ export async function GET(request: NextRequest) {
   console.log('--- GET /api/students CALLED ---');
   const session = await getServerSession(authOptions);
   
-  if (!session) {
-    console.log('API AUTH ERROR: No session found.');
+  if (!session || !session.user) {
+    console.log('API AUTH ERROR: No session or user found.');
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  console.log('Session user ID:', session.user.id);
+  console.log('Session user ID:', (session.user as { id?: string }).id);
 
   try {
     await connectToDatabase();
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     console.log('Filtering for grade:', grade);
 
     const filter: any = {
-      createdBy: session.user.id
+      createdBy: (session.user as { id?: string }).id
     };
 
     if (grade) {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) {
+  if (!session || !session.user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
     
     const newStudent = await StudentModel.create({
       ...body,
-      createdBy: session.user.id,
+      createdBy: (session.user as { id?: string }).id,
     });
     
     await Log.create({
-      user: session.user.id,
+      user: (session.user as { id?: string }).id,
       action: 'create_student',
       details: `Created student: ${newStudent.name} (ID: ${newStudent._id})`
     });
