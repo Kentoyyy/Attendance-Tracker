@@ -54,7 +54,7 @@ export default function HomePage() {
         <footer className="border-t border-border py-6">
           <div className="container mx-auto px-4 text-center">
             <p className="text-sm text-black">
-              © 2024 TeacherMia. All rights reserved.
+              © 2025 TeacherMia. All rights reserved.
             </p>
           </div>
         </footer>
