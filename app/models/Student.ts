@@ -9,6 +9,7 @@ export interface Student extends Document {
   photoUrl?: string;
   attendance?: any[]; // Simplified for this context
   createdBy: mongoose.Schema.Types.ObjectId;
+  archived: boolean;
 }
 
 // Mongoose schema for the Student
@@ -34,6 +35,10 @@ const StudentSchema: Schema<Student> = new Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  archived: {
+    type: Boolean,
+    default: false,
   },
 }, {
   timestamps: true, // Adds createdAt and updatedAt timestamps

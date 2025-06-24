@@ -11,6 +11,19 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get('studentId');
     const month = searchParams.get('month'); // YYYY-MM
+    const isExport = searchParams.get('export');
+
+    if (isExport) {
+      // Export all absences
+      const absences = await Attendance.find({ isAbsent: true }).populate('studentId');
+      const exportData = absences.map((record: any) => ({
+        studentName: record.studentId?.name || '',
+        grade: record.studentId?.grade || '',
+        date: record.date,
+        reason: record.reason || '',
+      }));
+      return NextResponse.json(exportData);
+    }
 
     if (!studentId || !month) {
       return NextResponse.json({ message: 'studentId and month are required' }, { status: 400 });
