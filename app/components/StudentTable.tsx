@@ -75,9 +75,15 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
   };
 
   // Robust filter: treat missing 'archived' as false (active)
-  const filteredStudents = students.filter(s =>
+  let filteredStudents = students.filter(s =>
     showArchived ? (s as any).archived === true : (s as any).archived !== true
   );
+  // Sort: males first, then females
+  filteredStudents = filteredStudents.sort((a, b) => {
+    if (a.gender === b.gender) return 0;
+    if (a.gender === 'Male') return -1;
+    return 1;
+  });
   const totalPages = Math.ceil(filteredStudents.length / studentsPerPage);
   const paginatedStudents = filteredStudents.slice((page - 1) * studentsPerPage, page * studentsPerPage);
 
