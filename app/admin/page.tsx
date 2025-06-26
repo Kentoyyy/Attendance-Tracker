@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app
 import { IUser } from '@/app/models/User';
 import { Student } from '@/app/models/Student';
 import TeacherStudentsModal from '../components/TeacherStudentsModal';
+import ChangePasswordModal from '../components/ChangePasswordModal';
+import { MoreVertical } from 'lucide-react';
 
 // Augment the Student type to include the populated createdBy field
 interface PopulatedStudent extends Omit<Student, 'createdBy'> {
@@ -37,6 +39,13 @@ export default function AdminDashboard() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<{ _id: string; name: string } | null>(null);
+
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [selectedTeacherForPassword, setSelectedTeacherForPassword] = useState<{ _id: string; name: string } | null>(null);
+
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; teacher: IUser | null }>({ open: false, teacher: null });
+
+  const [openMenuIdx, setOpenMenuIdx] = useState<number | null>(null);
 
   const fetchTeachers = async () => {
     setIsLoading(prev => ({ ...prev, teachers: true }));
@@ -105,9 +114,42 @@ export default function AdminDashboard() {
     });
     setIsModalOpen(true);
   };
+
+  const handleChangePassword = (teacher: IUser) => {
+    setSelectedTeacherForPassword({ 
+      _id: typeof teacher._id === 'string' ? teacher._id : String(teacher._id), 
+      name: typeof teacher.name === 'string' ? teacher.name : String(teacher.name) 
+    });
+    setIsChangePasswordModalOpen(true);
+  };
+
+  const handleDeleteTeacher = async (teacher: IUser) => {
+    if (!teacher) return;
+    try {
+      const res = await fetch(`/api/users/${teacher._id}`, {
+        method: 'DELETE',
+      });
+      await res.json();
+      fetchTeachers();
+    } catch (e) {
+      // Optionally show error
+    }
+    setDeleteDialog({ open: false, teacher: null });
+  };
+
   function isAdminUser(user: unknown): user is { role: string } {
     return typeof user === 'object' && user !== null && 'role' in user;
   }
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      setOpenMenuIdx(null);
+    };
+    if (openMenuIdx !== null) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [openMenuIdx]);
 
   if (
     status === 'loading' ||
@@ -167,13 +209,13 @@ export default function AdminDashboard() {
             <div className="mt-6 flow-root">
               <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
                 <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                  <div className="overflow-hidden border border-gray-200 rounded-lg">
+                  <div className="overflow-visible border border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                          <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -184,14 +226,39 @@ export default function AdminDashboard() {
                             <tr key={typeof teacher._id === 'string' || typeof teacher._id === 'number' ? teacher._id : idx} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{teacher.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.email}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <Button
-                                  variant="link"
-                                  className="p-0 h-auto font-semibold text-gray-700 hover:text-black"
-                                  onClick={() => handleViewStudents(teacher)}
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium relative">
+                                <button
+                                  className="p-2 rounded-full hover:bg-gray-100 focus:outline-none"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setOpenMenuIdx(openMenuIdx === idx ? null : idx);
+                                  }}
+                                  aria-label="More actions"
                                 >
-                                  View Students
-                                </Button>
+                                  <MoreVertical className="w-5 h-5 text-gray-700" />
+                                </button>
+                                {openMenuIdx === idx && (
+                                  <div className="absolute right-0 z-50 mt-2 w-44 bg-white border border-gray-200 rounded shadow-lg flex flex-col">
+                                    <button
+                                      className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-800"
+                                      onClick={() => { setOpenMenuIdx(null); handleViewStudents(teacher); }}
+                                    >
+                                      View Students
+                                    </button>
+                                    <button
+                                      className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-800"
+                                      onClick={() => { setOpenMenuIdx(null); handleChangePassword(teacher); }}
+                                    >
+                                      Change Password
+                                    </button>
+                                    <button
+                                      className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
+                                      onClick={() => { setOpenMenuIdx(null); setDeleteDialog({ open: true, teacher }); }}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           ))
@@ -213,6 +280,41 @@ export default function AdminDashboard() {
         onClose={() => setIsModalOpen(false)}
         teacher={selectedTeacher}
       />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+        teacher={selectedTeacherForPassword}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteDialog.open && deleteDialog.teacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
+            <h2 className="text-lg font-semibold mb-2">Delete Teacher</h2>
+            <p className="mb-4">Are you sure you want to <b>delete</b> <b>{deleteDialog.teacher.name}</b>? This action cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                className="bg-white text-gray-800 border border-gray-300 hover:bg-gray-100"
+                onClick={() => setDeleteDialog({ open: false, teacher: null })}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 text-white"
+                onClick={() => {
+                  if (deleteDialog.teacher) {
+                    handleDeleteTeacher(deleteDialog.teacher);
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

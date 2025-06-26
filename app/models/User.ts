@@ -5,6 +5,7 @@ export interface IUser extends Document {
   password?: string; // Password won't be sent to client
   name: string;
   role: 'teacher' | 'admin';
+  archived?: boolean;
 }
 
 const UserSchema: Schema<IUser> = new Schema({
@@ -27,7 +28,11 @@ const UserSchema: Schema<IUser> = new Schema({
     type: String,
     enum: ['teacher', 'admin'],
     default: 'teacher',
-  }
+  },
+  archived: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: true,
 });

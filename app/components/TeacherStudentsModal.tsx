@@ -46,6 +46,19 @@ export default function TeacherStudentsModal({ isOpen, onClose, teacher }: Teach
     }
   }, [isOpen, teacher]);
 
+  // Group students by grade
+  const studentsByGrade: { [grade: number]: Student[] } = {};
+  students.forEach(student => {
+    if (!studentsByGrade[student.grade]) {
+      studentsByGrade[student.grade] = [];
+    }
+    studentsByGrade[student.grade].push(student);
+  });
+
+  const sortedGrades = Object.keys(studentsByGrade)
+    .map(Number)
+    .sort((a, b) => a - b);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl bg-white">
@@ -69,13 +82,22 @@ export default function TeacherStudentsModal({ isOpen, onClose, teacher }: Teach
                 {isLoading ? (
                   <tr><td colSpan={3} className="text-center p-6">Loading students...</td></tr>
                 ) : students.length > 0 ? (
-                  students.map(student => (
-                    <tr key={student._id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.grade}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.gender}</td>
-                    </tr>
-                  ))
+                  sortedGrades.map(grade => {
+                    // Sort within grade: males first, then females, both alphabetically
+                    const studentsInGrade = [...studentsByGrade[grade]].sort((a, b) => {
+                      if (a.gender !== b.gender) {
+                        return a.gender === 'Male' ? -1 : 1;
+                      }
+                      return a.name.localeCompare(b.name);
+                    });
+                    return studentsInGrade.map(student => (
+                      <tr key={student._id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.grade}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.gender}</td>
+                      </tr>
+                    ));
+                  })
                 ) : (
                   <tr><td colSpan={3} className="text-center p-6">This teacher has not added any students yet.</td></tr>
                 )}

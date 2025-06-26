@@ -72,7 +72,7 @@ export default function Dashboard() {
 
   const handleExportClick = async () => {
     const res = await fetch('/api/attendance/export');
-    const absences: any[] = await res.json();
+    const absences = await res.json();
     const worksheet = XLSX.utils.json_to_sheet(absences);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Absences');
