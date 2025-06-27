@@ -12,6 +12,7 @@ import { Student } from '@/app/models/Student';
 import TeacherStudentsModal from '../components/TeacherStudentsModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import { MoreVertical } from 'lucide-react';
+import EditTeacherModal from '../components/EditTeacherModal';
 
 // Augment the Student type to include the populated createdBy field
 interface PopulatedStudent extends Omit<Student, 'createdBy'> {
@@ -33,7 +34,7 @@ export default function AdminDashboard() {
   
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherEmail, setNewTeacherEmail] = useState('');
-  const [newTeacherPassword, setNewTeacherPassword] = useState('');
+  const [newTeacherPin, setNewTeacherPin] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
 
@@ -46,6 +47,9 @@ export default function AdminDashboard() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; teacher: IUser | null }>({ open: false, teacher: null });
 
   const [openMenuIdx, setOpenMenuIdx] = useState<number | null>(null);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedTeacherForEdit, setSelectedTeacherForEdit] = useState<IUser | null>(null);
 
   const fetchTeachers = async () => {
     setIsLoading(prev => ({ ...prev, teachers: true }));
@@ -86,7 +90,7 @@ export default function AdminDashboard() {
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newTeacherName, email: newTeacherEmail, password: newTeacherPassword, role: 'teacher' }),
+        body: JSON.stringify({ name: newTeacherName, email: newTeacherEmail, pin: newTeacherPin, role: 'teacher' }),
       });
 
       const data = await res.json();
@@ -95,7 +99,7 @@ export default function AdminDashboard() {
         setSubmitMessage(`Teacher account for ${data.name} created successfully!`);
         setNewTeacherName('');
         setNewTeacherEmail('');
-        setNewTeacherPassword('');
+        setNewTeacherPin('');
         fetchTeachers(); // Refresh teachers list
       } else {
         setSubmitMessage(data.message || 'Failed to create teacher account.');
@@ -135,6 +139,28 @@ export default function AdminDashboard() {
       // Optionally show error
     }
     setDeleteDialog({ open: false, teacher: null });
+  };
+
+  const handleEditTeacher = (teacher: IUser) => {
+    setSelectedTeacherForEdit(teacher);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditTeacherSave = async (updatedTeacher: { _id: string; name: string; email: string }) => {
+    try {
+      const res = await fetch(`/api/users/${updatedTeacher._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: updatedTeacher.name, email: updatedTeacher.email }),
+      });
+      if (res.ok) {
+        fetchTeachers();
+        setIsEditModalOpen(false);
+        setSelectedTeacherForEdit(null);
+      }
+    } catch (e) {
+      // Optionally show error
+    }
   };
 
   function isAdminUser(user: unknown): user is { role: string } {
@@ -185,16 +211,14 @@ export default function AdminDashboard() {
                 <Input id="name" value={newTeacherName} onChange={e => setNewTeacherName(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" />
               </div>
               <div>
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email Address</Label>
-                <Input id="email" type="email" value={newTeacherEmail} onChange={e => setNewTeacherEmail(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" />
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
+                <Input id="email" type="email" value={newTeacherEmail} onChange={e => setNewTeacherEmail(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" placeholder="teacher@email.com" />
               </div>
               <div>
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
-                <Input id="password" type="password" value={newTeacherPassword} onChange={e => setNewTeacherPassword(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" />
+                <Label htmlFor="pin" className="text-sm font-medium text-gray-700">PIN</Label>
+                <Input id="pin" type="password" value={newTeacherPin} onChange={e => setNewTeacherPin(e.target.value)} required disabled={isSubmitting} className="mt-1 bg-white text-gray-900 border-gray-300" maxLength={6} minLength={6} pattern="[0-9]{6}" placeholder="6-digit PIN" />
               </div>
-              
               {submitMessage && <p className={`text-sm ${submitMessage.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>{submitMessage}</p>}
-              
               <Button type="submit" disabled={isSubmitting} className="w-full justify-center bg-gray-900 text-white hover:bg-gray-800">
                 {isSubmitting ? 'Creating Account...' : 'Create Account'}
               </Button>
@@ -252,6 +276,12 @@ export default function AdminDashboard() {
                                       Change Password
                                     </button>
                                     <button
+                                      className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-800"
+                                      onClick={() => { setOpenMenuIdx(null); handleEditTeacher(teacher); }}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
                                       className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
                                       onClick={() => { setOpenMenuIdx(null); setDeleteDialog({ open: true, teacher }); }}
                                     >
@@ -285,6 +315,13 @@ export default function AdminDashboard() {
         isOpen={isChangePasswordModalOpen}
         onClose={() => setIsChangePasswordModalOpen(false)}
         teacher={selectedTeacherForPassword}
+      />
+
+      <EditTeacherModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        teacher={selectedTeacherForEdit}
+        onSave={handleEditTeacherSave}
       />
 
       {/* Delete Confirmation Dialog */}

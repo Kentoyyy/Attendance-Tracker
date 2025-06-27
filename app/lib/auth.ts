@@ -10,40 +10,56 @@ export const authOptions: NextAuthOptions = {
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: {  label: "Password", type: "password" }
+        password: {  label: "Password", type: "password" },
+        name: { label: "Name", type: "text" },
+        pin: { label: "PIN", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
+        // Teacher login with PIN only
+        if (credentials?.pin && !credentials?.name) {
+          await connectToDatabase();
+          const allTeachers = await User.find({ role: 'teacher' }).select('+pin +name');
+          let matchedUser = null;
+          for (const teacher of allTeachers) {
+            if (typeof teacher.pin === 'string' && await bcrypt.compare(credentials.pin, teacher.pin)) {
+              matchedUser = teacher;
+              break;
+            }
+          }
+          if (!matchedUser) {
+            return null;
+          }
+          return {
+            id: typeof matchedUser._id === 'object' && matchedUser._id !== null && 'toString' in matchedUser._id
+              ? matchedUser._id.toString()
+              : String(matchedUser._id),
+            name: matchedUser.name,
+            role: matchedUser.role,
+          };
         }
-
-        await connectToDatabase();
-
-        const user = await User.findOne({ email: credentials.email }).select("+password");
-
-        if (!user) {
-          return null;
+        // Admin login with password only
+        if (credentials?.password && !credentials?.email) {
+          await connectToDatabase();
+          const allAdmins = await User.find({ role: 'admin' }).select('+password +name');
+          let matchedAdmin = null;
+          for (const admin of allAdmins) {
+            if (typeof admin.password === 'string' && await bcrypt.compare(credentials.password, admin.password)) {
+              matchedAdmin = admin;
+              break;
+            }
+          }
+          if (!matchedAdmin) {
+            return null;
+          }
+          return {
+            id: typeof matchedAdmin._id === 'object' && matchedAdmin._id !== null && 'toString' in matchedAdmin._id
+              ? matchedAdmin._id.toString()
+              : String(matchedAdmin._id),
+            name: matchedAdmin.name,
+            role: matchedAdmin.role,
+          };
         }
-
-        // Ensure user.password is a string before comparing
-        if (typeof user.password !== "string") {
-          return null;
-        }
-
-        const isPasswordMatch = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isPasswordMatch) {
-          return null;
-        }
-
-        return {
-          id: typeof user._id === "object" && user._id !== null && "toString" in user._id
-            ? user._id.toString()
-            : String(user._id),
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        };
+        return null;
       }
     })
   ],

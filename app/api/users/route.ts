@@ -52,31 +52,47 @@ export async function POST(request: NextRequest) {
     try {
         await connectToDatabase();
         const body = await request.json();
-        const { name, email, password, role } = body;
+        const { name, email, password, pin, role } = body;
 
-        if (!name || !email || !password) {
-            return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+        if (role === 'teacher') {
+            if (!name || !pin || !email) {
+                return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+            }
+            const existingTeacher = await User.findOne({ name, role: 'teacher' });
+            if (existingTeacher) {
+                return NextResponse.json({ message: 'Teacher with this name already exists' }, { status: 409 });
+            }
+            const hashedPin = await bcrypt.hash(pin, 10);
+            const newUser = await User.create({
+                name,
+                email,
+                pin: hashedPin,
+                role: 'teacher',
+            });
+            const userResponse = newUser.toObject();
+            delete userResponse.pin;
+            return NextResponse.json(userResponse, { status: 201 });
+        } else if (role === 'admin') {
+            if (!name || !email || !password) {
+                return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+            }
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                return NextResponse.json({ message: 'User with this email already exists' }, { status: 409 });
+            }
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const newUser = await User.create({
+                name,
+                email,
+                password: hashedPassword,
+                role: 'admin',
+            });
+            const userResponse = newUser.toObject();
+            delete userResponse.password;
+            return NextResponse.json(userResponse, { status: 201 });
+        } else {
+            return NextResponse.json({ message: 'Invalid role' }, { status: 400 });
         }
-
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return NextResponse.json({ message: 'User with this email already exists' }, { status: 409 });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        const newUser = await User.create({
-            name,
-            email,
-            password: hashedPassword,
-            role: role || 'teacher', // Default to teacher if not specified
-        });
-        
-        // Don't send the password back
-        const userResponse = newUser.toObject();
-        delete userResponse.password;
-
-        return NextResponse.json(userResponse, { status: 201 });
 
     } catch (error) {
         if (error instanceof Error && error.name === 'ValidationError') {

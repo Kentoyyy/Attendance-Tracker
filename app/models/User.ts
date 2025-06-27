@@ -1,24 +1,31 @@
 import mongoose, { Schema, Document, models, Model } from 'mongoose';
 
 export interface IUser extends Document {
-  email: string;
+  email?: string;
   password?: string; // Password won't be sent to client
   name: string;
   role: 'teacher' | 'admin';
+  pin?: string; // Add PIN for teachers
   archived?: boolean;
 }
 
 const UserSchema: Schema<IUser> = new Schema({
   email: {
     type: String,
-    required: [true, 'Please provide an email for this user.'],
-    unique: true,
+    required: function(this: any) { return this.role === 'admin'; },
+    unique: false, // Only unique for admins, not teachers
+    sparse: true,
     match: [/.+\@.+\..+/, 'Please provide a valid email address.'],
   },
   password: {
     type: String,
-    required: [true, 'Please provide a password.'],
+    required: function(this: any) { return this.role === 'admin'; },
     select: false, // Don't return password by default
+  },
+  pin: {
+    type: String,
+    required: function(this: any) { return this.role === 'teacher'; },
+    select: false, // Don't return PIN by default
   },
   name: {
     type: String,
