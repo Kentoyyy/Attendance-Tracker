@@ -49,7 +49,7 @@ export default function AdminDashboard() {
   const [openMenuIdx, setOpenMenuIdx] = useState<number | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedTeacherForEdit, setSelectedTeacherForEdit] = useState<IUser | null>(null);
+  const [selectedTeacherForEdit, setSelectedTeacherForEdit] = useState<{ _id: string; name: string; email: string } | null>(null);
 
   const fetchTeachers = async () => {
     setIsLoading(prev => ({ ...prev, teachers: true }));
@@ -142,7 +142,11 @@ export default function AdminDashboard() {
   };
 
   const handleEditTeacher = (teacher: IUser) => {
-    setSelectedTeacherForEdit(teacher);
+    setSelectedTeacherForEdit({
+      _id: typeof teacher._id === 'string' ? teacher._id : String(teacher._id),
+      name: teacher.name,
+      email: teacher.email || ''
+    });
     setIsEditModalOpen(true);
   };
 
