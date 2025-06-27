@@ -22,14 +22,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user || (session.user as { role?: string }).role !== 'admin') {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
   try {
     await connectToDatabase();
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { name, email } = body;
     const updatedUser = await User.findByIdAndUpdate(id, { name, email }, { new: true });
