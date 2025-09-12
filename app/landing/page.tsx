@@ -8,6 +8,11 @@ import LoginModal from '../components/LoginModal';
 export default function LandingPage() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
+  const handleLoginClick = () => {
+    console.log('Login button clicked'); // Debug log
+    setIsLoginModalOpen(true);
+  };
+
   return (
     <>
       <div className="min-h-screen flex flex-col bg-white text-foreground font-sans">
@@ -20,14 +25,14 @@ export default function LandingPage() {
               Focus on your students, not paperwork. TeacherMia provides a clean, modern, and intuitive
               interface to track attendance, monitor patterns, and keep everything organized.
             </p>
-            <Button
-              size="lg"
-              onClick={() => setIsLoginModalOpen(true)}
-              className="cursor-pointer bg-gray-900 text-white hover:bg-gray-800"
+            <button
+              onClick={handleLoginClick}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 h-11 px-8 py-2 cursor-pointer transition-colors"
+              type="button"
             >
               Proceed to Login
               <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+            </button>
           </div>
         </main>
 

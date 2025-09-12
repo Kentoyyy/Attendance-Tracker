@@ -37,23 +37,37 @@ export function AbsenceNotesModal({ isOpen, onOpenChange, student, record, onNot
 
     setIsSaving(true);
     try {
+      const studentId = String((student as any).id ?? (student as any)._id);
+      const d = new Date(record.date);
+      d.setUTCHours(0, 0, 0, 0);
       const response = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: student._id,
-          date: record.date,
-          isAbsent: true,
+          studentId,
+          date: d.toISOString(),
+          status: 'ABSENT',
           reason,
         }),
       });
 
       if (response.ok) {
-        const updatedRecord = await response.json();
+        const upserted = await response.json();
+        const updatedRecord: AttendanceRecord = {
+          _id: String(upserted.id ?? record._id ?? `${studentId}-${record.date}`),
+          studentId,
+          date: d.toISOString(),
+          isAbsent: true,
+          reason,
+        };
         onNoteSave(updatedRecord);
         onOpenChange(false);
       } else {
-        console.error('Failed to save note');
+        let details: any = null;
+        try { details = await response.json(); } catch {
+          try { const t = await response.text(); details = t || null; } catch {}
+        }
+        console.error('Failed to save note', details || response.statusText);
       }
     } catch (error) {
       console.error('Error saving note:', error);

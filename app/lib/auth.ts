@@ -1,89 +1,66 @@
 import CredentialsProvider from "next-auth/providers/credentials"
-import { connectToDatabase } from "@/app/lib/mongodb"
-import User from "@/app/models/User"
-import bcrypt from "bcryptjs"
 import { NextAuthOptions } from "next-auth"
+import prisma from "@/app/lib/prisma"
+import bcrypt from "bcryptjs"
 
 export const authOptions: NextAuthOptions = {
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: {  label: "Password", type: "password" },
-        name: { label: "Name", type: "text" },
-        pin: { label: "PIN", type: "password" },
-      },
-      async authorize(credentials) {
-        // Teacher login with PIN only
-        if (credentials?.pin && !credentials?.name) {
-          await connectToDatabase();
-          const allTeachers = await User.find({ role: 'teacher' }).select('+pin +name');
-          let matchedUser = null;
-          for (const teacher of allTeachers) {
-            if (typeof teacher.pin === 'string' && await bcrypt.compare(credentials.pin, teacher.pin)) {
-              matchedUser = teacher;
-              break;
-            }
-          }
-          if (!matchedUser) {
-            return null;
-          }
-          return {
-            id: typeof matchedUser._id === 'object' && matchedUser._id !== null && 'toString' in matchedUser._id
-              ? matchedUser._id.toString()
-              : String(matchedUser._id),
-            name: matchedUser.name,
-            role: matchedUser.role,
-          };
-        }
-        // Admin login with password only
-        if (credentials?.password && !credentials?.email) {
-          await connectToDatabase();
-          const allAdmins = await User.find({ role: 'admin' }).select('+password +name');
-          let matchedAdmin = null;
-          for (const admin of allAdmins) {
-            if (typeof admin.password === 'string' && await bcrypt.compare(credentials.password, admin.password)) {
-              matchedAdmin = admin;
-              break;
-            }
-          }
-          if (!matchedAdmin) {
-            return null;
-          }
-          return {
-            id: typeof matchedAdmin._id === 'object' && matchedAdmin._id !== null && 'toString' in matchedAdmin._id
-              ? matchedAdmin._id.toString()
-              : String(matchedAdmin._id),
-            name: matchedAdmin.name,
-            role: matchedAdmin.role,
-          };
-        }
-        return null;
-      }
-    })
-  ],
-  callbacks: {
-    async jwt({ token, user }: any) {
-      if (user) {
-        token.id = user.id;
-        token.role = user.role;
-      }
-      return token;
-    },
-    async session({ session, token }: any) {
-      if (session.user) {
-        session.user.id = token.id;
-        session.user.role = token.role;
-      }
-      return session;
-    }
-  },
-  pages: {
-    signIn: "/login",
-  },
-  session: {
-    strategy: "jwt" as const,
-  },
-  secret: process.env.NEXTAUTH_SECRET,
+	providers: [
+		CredentialsProvider({
+			name: "Credentials",
+			credentials: {
+				email: { label: "Email", type: "email" },
+				password: {  label: "Password", type: "password" },
+				name: { label: "Name", type: "text" },
+				pin: { label: "PIN", type: "password" },
+			},
+			async authorize(credentials) {
+				// Teacher login with PIN only (hashed validation)
+				if (credentials?.pin && !credentials?.name) {
+					const teacher = await prisma.user.findFirst({
+						where: { role: "TEACHER" },
+						select: { id: true, name: true, role: true, pin: true },
+					});
+					if (!teacher || !teacher.pin) return null;
+					const ok = await bcrypt.compare(credentials.pin, teacher.pin);
+					if (!ok) return null;
+					return { id: teacher.id, name: teacher.name, role: "teacher" } as any;
+				}
+				// Admin login with password only
+				if (credentials?.password && !credentials?.email) {
+					const admin = await prisma.user.findFirst({
+						where: { role: "ADMIN" },
+						select: { id: true, name: true, role: true, password: true },
+					});
+					if (!admin || !admin.password) return null;
+					const ok = await bcrypt.compare(credentials.password, admin.password);
+					if (!ok) return null;
+					return { id: admin.id, name: admin.name, role: "admin" } as any;
+				}
+				return null;
+			}
+		})
+	],
+	callbacks: {
+		async jwt({ token, user }: any) {
+			if (user) {
+				token.id = user.id;
+				token.role = (user.role || "").toString().toLowerCase();
+			}
+			return token;
+		},
+		async session({ session, token }: any) {
+			if (session.user) {
+				session.user.id = token.id;
+				session.user.role = (token.role || "").toString().toLowerCase();
+			}
+			return session;
+		}
+	},
+	pages: {
+		signIn: "/login",
+	},
+	session: {
+		strategy: "jwt" as const,
+	},
+	secret: process.env.NEXTAUTH_SECRET,
 }; 

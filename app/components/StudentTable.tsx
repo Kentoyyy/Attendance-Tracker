@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Student, AttendanceRecord } from '../types';
 import { getDaysInMonth, format, startOfMonth, getDate, isToday, getDay } from 'date-fns';
 import { WarningNote } from './WarningNote';
@@ -37,6 +37,20 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
 
   const dates = getMonthDates(currentMonth);
 
+  // Set of dates (yyyy-MM-dd) where any student is absent, for header highlighting
+  const absentDatesSet = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(attendance).forEach((records) => {
+      (records || []).forEach((r) => {
+        const isAbsent = (r as any).isAbsent === true || (r as any).status === 'ABSENT';
+        if (!isAbsent) return;
+        const ds = format(new Date((r as any).date), 'yyyy-MM-dd');
+        if (ds) set.add(ds);
+      });
+    });
+    return set;
+  }, [attendance]);
+
   // Pagination state
   const [page, setPage] = useState(1);
   const studentsPerPage = 8;
@@ -47,13 +61,14 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
   // allSelected now checks if all paginatedStudents are selected
   let allSelected = false;
   // paginatedStudents will be defined later, so we use a function to check after its declaration
+  const getStudentId = (s: any) => String((s as any).id ?? (s as any)._id);
   const isAllSelected = (students: Student[]) =>
-    students.length > 0 && students.every(s => selectedIds.includes(s._id));
+    students.length > 0 && students.every(s => selectedIds.includes(getStudentId(s)));
   const toggleSelectAll = () => {
     if (allSelected) {
-      setSelectedIds(ids => ids.filter(id => !paginatedStudents.some(s => s._id === id)));
+      setSelectedIds(ids => ids.filter(id => !paginatedStudents.some(s => getStudentId(s) === id)));
     } else {
-      setSelectedIds(ids => Array.from(new Set([...ids, ...paginatedStudents.map(s => s._id)])));
+      setSelectedIds(ids => Array.from(new Set([...ids, ...paginatedStudents.map(s => getStudentId(s))])));
     }
   };
   const toggleSelect = (id: string) => {
@@ -93,11 +108,12 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
     
     for (const student of studentList) {
       try {
-        const res = await fetch(`/api/attendance?studentId=${student._id}&month=${monthStr}`);
-        newAttendance[student._id] = res.ok ? await res.json() : [];
+        const sid = getStudentId(student);
+        const res = await fetch(`/api/attendance?studentId=${sid}&month=${monthStr}`);
+        newAttendance[sid] = res.ok ? await res.json() : [];
       } catch (error) {
         console.error(`Failed to fetch attendance for ${student.name}`, error);
-        newAttendance[student._id] = [];
+        newAttendance[getStudentId(student)] = [];
       }
     }
     setAttendance(newAttendance);
@@ -122,7 +138,7 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
 
     if (isCurrentlyAbsent) {
       // If student is absent, open the modal to edit the note.
-      const record = attendance[student._id]?.find(r => format(new Date(r.date), 'yyyy-MM-dd') === dateStr);
+      const record = attendance[getStudentId(student)]?.find(r => format(new Date(r.date), 'yyyy-MM-dd') === dateStr);
       if (record) {
         setSelectedStudentForNote(student);
         setSelectedRecordForNote(record);
@@ -130,7 +146,7 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
       }
     } else {
       // If student is present, open the modal to mark them as absent with a potential reason.
-      const newRecordTemplate = { _id: `new-${Date.now()}`, studentId: student._id, date: dateStr, isAbsent: true, reason: '' };
+      const newRecordTemplate = { _id: `new-${Date.now()}`, studentId: getStudentId(student), date: dateStr, isAbsent: true, reason: '' };
       setSelectedStudentForNote(student);
       setSelectedRecordForNote(newRecordTemplate);
       setNoteModalOpen(true);
@@ -167,7 +183,7 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
 
   const handleStudentHover = (student: Student) => {
     setHoveredStudent(student);
-    const studentAbsences = attendance[student._id]?.filter(r => r.isAbsent) || [];
+    const studentAbsences = attendance[getStudentId(student)]?.filter(r => r.isAbsent) || [];
     setHoveredAbsences(studentAbsences);
   };
 
@@ -289,10 +305,12 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
               </th>
               {dates.map(date => {
                 const isCurrentDay = isToday(date);
+                const dateStrHead = format(date, 'yyyy-MM-dd');
+                const isAnyAbsent = absentDatesSet.has(dateStrHead);
                 return (
-                  <th key={date.toString()} scope="col" className={`px-2 py-3 text-center text-xs font-medium uppercase tracking-wider ${isCurrentDay ? 'bg-blue-100 text-blue-800' : 'text-gray-500'}`}>
-                    <div className={`font-normal ${isCurrentDay ? 'text-blue-600' : 'text-gray-400'}`}>{format(date, 'eee')}</div>
-                    <div className={`mt-1 font-semibold ${isCurrentDay ? 'bg-blue-600 text-white rounded-full h-6 w-6 flex items-center justify-center mx-auto' : ''}`}>{getDate(date)}</div>
+                  <th key={date.toString()} scope="col" className={`px-2 py-3 text-center text-xs font-medium uppercase tracking-wider ${isCurrentDay ? 'bg-blue-100 text-blue-800' : isAnyAbsent ? 'bg-red-50 text-red-700' : 'text-gray-500'}`}>
+                    <div className={`font-normal ${isCurrentDay ? 'text-blue-600' : isAnyAbsent ? 'text-red-700' : 'text-gray-400'}`}>{format(date, 'eee')}</div>
+                    <div className={`mt-1 font-semibold ${isCurrentDay ? 'bg-blue-600 text-white rounded-full h-6 w-6 flex items-center justify-center mx-auto' : isAnyAbsent ? 'bg-red-600 text-white rounded-full h-6 w-6 flex items-center justify-center mx-auto' : ''}`}>{getDate(date)}</div>
                   </th>
                 );
               })}
@@ -303,17 +321,21 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedStudents.map(student => {
-              const studentAttendance = attendance[student._id] || [];
+              const sid = getStudentId(student);
+              const studentAttendance = attendance[sid] || [];
               const absentCount = studentAttendance.filter(r => r.isAbsent).length;
               
               return (
-                <tr key={student._id}>
+                <tr key={sid}>
                   <td className="px-2 py-4">
-                    <input type="checkbox" checked={selectedIds.includes(student._id)} onChange={() => toggleSelect(student._id)} />
+                    <input type="checkbox" checked={selectedIds.includes(sid)} onChange={() => toggleSelect(sid)} />
                   </td>
                   <td className="sticky left-0 bg-white px-3 sm:px-6 py-4 whitespace-nowrap z-10">
                     <div className="flex items-center">
-                      <div className="font-medium text-gray-900 text-sm sm:text-base">{student.name}</div>
+                      <div className="font-medium text-gray-900 text-sm sm:text-base">{student.name ?? `${student.firstName ?? ''}${student.lastName ? ' ' + student.lastName : ''}`}</div>
+                      {absentCount > 0 && (
+                        <span className="ml-2 text-xs text-red-600">({absentCount})</span>
+                      )}
                       {student.gender && (
                         <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}`}>
                           {student.gender}
@@ -323,8 +345,8 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
                   </td>
                   {dates.map(date => {
                     const dateStr = format(date, 'yyyy-MM-dd');
-                    const record = studentAttendance.find(r => format(new Date(r.date), 'yyyy-MM-dd') === dateStr);
-                    const isAbsent = record?.isAbsent || false;
+                    const record = studentAttendance.find(r => format(new Date((r as any).date), 'yyyy-MM-dd') === dateStr);
+                    const isAbsent = (record as any)?.isAbsent === true || (record as any)?.status === 'ABSENT';
                     const isCurrentDay = isToday(date);
 
                     return (
@@ -335,10 +357,11 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
                           onMouseLeave={handleAbsenceLeave}
                           className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors duration-200
                             ${isAbsent 
-                              ? 'bg-red-100 text-red-800 font-bold hover:bg-red-200' 
-                              : 'text-gray-500 hover:bg-gray-100'
+                              ? 'bg-red-100 text-red-800 font-bold hover:bg-red-200 hover:ring-2 hover:ring-red-300' 
+                              : 'text-gray-500 hover:bg-gray-100 hover:ring-2 hover:ring-gray-300'
                             }`
                           }
+                          title={isAbsent ? (record?.reason ? `Absent: ${record.reason}` : 'Absent') : 'Mark absent'}
                           aria-label={`Mark day ${getDate(date)} for ${student.name}`}
                         >
                           {getDate(date)}

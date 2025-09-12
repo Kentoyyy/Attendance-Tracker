@@ -7,8 +7,8 @@ import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
-import { IUser } from '@/app/models/User';
-import { Student } from '@/app/models/Student';
+type IUser = { id: string; name: string; email?: string; role?: string };
+type Student = { id: string; name: string; grade?: number; createdBy: string };
 import TeacherStudentsModal from '../components/TeacherStudentsModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import { MoreVertical } from 'lucide-react';
@@ -17,7 +17,7 @@ import EditTeacherModal from '../components/EditTeacherModal';
 // Augment the Student type to include the populated createdBy field
 interface PopulatedStudent extends Omit<Student, 'createdBy'> {
   createdBy: {
-    _id: string;
+    id: string;
     name: string;
   }
 }
@@ -42,7 +42,7 @@ export default function AdminDashboard() {
   const [selectedTeacher, setSelectedTeacher] = useState<{ _id: string; name: string } | null>(null);
 
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
-  const [selectedTeacherForPassword, setSelectedTeacherForPassword] = useState<{ _id: string; name: string } | null>(null);
+  const [selectedTeacherForPassword, setSelectedTeacherForPassword] = useState<{ _id: string; name: string; role?: string } | null>(null);
 
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; teacher: IUser | null }>({ open: false, teacher: null });
 
@@ -113,16 +113,17 @@ export default function AdminDashboard() {
 
   const handleViewStudents = (teacher: IUser) => {
     setSelectedTeacher({ 
-      _id: typeof teacher._id === 'string' ? teacher._id : String(teacher._id), 
-      name: typeof teacher.name === 'string' ? teacher.name : String(teacher.name) 
+      _id: teacher.id, 
+      name: teacher.name 
     });
     setIsModalOpen(true);
   };
 
   const handleChangePassword = (teacher: IUser) => {
     setSelectedTeacherForPassword({ 
-      _id: typeof teacher._id === 'string' ? teacher._id : String(teacher._id), 
-      name: typeof teacher.name === 'string' ? teacher.name : String(teacher.name) 
+      _id: teacher.id, 
+      name: teacher.name,
+      role: teacher.role
     });
     setIsChangePasswordModalOpen(true);
   };
@@ -130,7 +131,7 @@ export default function AdminDashboard() {
   const handleDeleteTeacher = async (teacher: IUser) => {
     if (!teacher) return;
     try {
-      const res = await fetch(`/api/users/${teacher._id}`, {
+      const res = await fetch(`/api/users/${teacher.id}`, {
         method: 'DELETE',
       });
       await res.json();
@@ -143,7 +144,7 @@ export default function AdminDashboard() {
 
   const handleEditTeacher = (teacher: IUser) => {
     setSelectedTeacherForEdit({
-      _id: typeof teacher._id === 'string' ? teacher._id : String(teacher._id),
+      _id: teacher.id,
       name: teacher.name,
       email: teacher.email || ''
     });
@@ -251,7 +252,7 @@ export default function AdminDashboard() {
                           <tr><td colSpan={3} className="text-center p-6 text-sm text-gray-500">Loading teachers...</td></tr>
                         ) : teachers.length > 0 ? (
                           teachers.map((teacher, idx) => (
-                            <tr key={typeof teacher._id === 'string' || typeof teacher._id === 'number' ? teacher._id : idx} className="hover:bg-gray-50">
+                            <tr key={teacher.id ?? idx} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{teacher.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.email}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium relative">
@@ -277,7 +278,7 @@ export default function AdminDashboard() {
                                       className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-800"
                                       onClick={() => { setOpenMenuIdx(null); handleChangePassword(teacher); }}
                                     >
-                                      Change Password
+                                      {teacher.role?.toLowerCase() === 'teacher' ? 'Change PIN' : 'Change Password'}
                                     </button>
                                     <button
                                       className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-800"

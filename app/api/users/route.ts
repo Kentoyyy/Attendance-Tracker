@@ -1,103 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/app/lib/mongodb';
-import User from '@/app/models/User';
-import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/lib/auth';
+import prisma from '@/app/lib/prisma';
+import bcrypt from 'bcryptjs';
+import type { Prisma } from '@prisma/client';
 
 // GET all users (or filter by role)
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  // Type assertion to allow access to 'role' property
-  if (
-    !session ||
-    !session.user ||
-    (session.user as { role?: string }).role !== 'admin'
-  ) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
+	const session = await getServerSession(authOptions);
+	if (!session || !session.user || (session.user as { role?: string }).role !== 'admin') {
+		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+	}
 
-  try {
-    await connectToDatabase();
-    const { searchParams } = new URL(request.url);
-    const role = searchParams.get('role');
-
-    const filter: any = {};
-    if (role) {
-      filter.role = role;
-    }
-    
-    // Admin can get all users, optionally filtered by role
-    const users = await User.find(filter).sort({ createdAt: -1 });
-
-    return NextResponse.json(users);
-  } catch (error) {
-    return NextResponse.json({ message: 'Failed to fetch users', error }, { status: 500 });
-  }
+	try {
+		const { searchParams } = new URL(request.url);
+		const roleParam = searchParams.get('role');
+		const roleFilter = roleParam ? roleParam.toUpperCase() : undefined;
+		const users = await prisma.user.findMany({ where: roleFilter ? { role: roleFilter as any } : {}, orderBy: { createdAt: 'desc' } });
+		return NextResponse.json(users);
+	} catch (error) {
+		return NextResponse.json({ message: 'Failed to fetch users', error }, { status: 500 });
+	}
 }
 
-// POST a new user (create teacher)
+// POST a new user (create teacher or admin)
 export async function POST(request: NextRequest) {
-    const session = await getServerSession(authOptions);
-    // For now, allow admin to create. Later you could add a self-registration option.
-    // Type assertion to allow access to 'role' property
-    if (
-        !session ||
-        !session.user ||
-        (session.user as { role?: string }).role !== 'admin'
-    ) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
+	const session = await getServerSession(authOptions);
+	if (!session || !session.user || (session.user as { role?: string }).role !== 'admin') {
+		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+	}
 
-    try {
-        await connectToDatabase();
-        const body = await request.json();
-        const { name, email, password, pin, role } = body;
+	try {
+		const body = await request.json();
+		const { name, email, password, pin, role } = body as { name?: string; email?: string; password?: string; pin?: string; role?: 'teacher' | 'admin' };
 
-        if (role === 'teacher') {
-            if (!name || !pin || !email) {
-                return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
-            }
-            const existingTeacher = await User.findOne({ name, role: 'teacher' });
-            if (existingTeacher) {
-                return NextResponse.json({ message: 'Teacher with this name already exists' }, { status: 409 });
-            }
-            const hashedPin = await bcrypt.hash(pin, 10);
-            const newUser = await User.create({
-                name,
-                email,
-                pin: hashedPin,
-                role: 'teacher',
-            });
-            const userResponse = newUser.toObject();
-            delete userResponse.pin;
-            return NextResponse.json(userResponse, { status: 201 });
-        } else if (role === 'admin') {
-            if (!name || !email || !password) {
-                return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
-            }
-            const existingUser = await User.findOne({ email });
-            if (existingUser) {
-                return NextResponse.json({ message: 'User with this email already exists' }, { status: 409 });
-            }
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const newUser = await User.create({
-                name,
-                email,
-                password: hashedPassword,
-                role: 'admin',
-            });
-            const userResponse = newUser.toObject();
-            delete userResponse.password;
-            return NextResponse.json(userResponse, { status: 201 });
-        } else {
-            return NextResponse.json({ message: 'Invalid role' }, { status: 400 });
-        }
-
-    } catch (error) {
-        if (error instanceof Error && error.name === 'ValidationError') {
-             return NextResponse.json({ message: 'Validation Error', error: error.message }, { status: 400 });
-        }
-        return NextResponse.json({ message: 'Failed to create user', error }, { status: 500 });
-    }
+		if (role === 'teacher') {
+			if (!name || !pin || !email) {
+				return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+			}
+			const existing = await prisma.user.findFirst({ where: { name, role: 'TEACHER' } });
+			if (existing) {
+				return NextResponse.json({ message: 'Teacher with this name already exists' }, { status: 409 });
+			}
+			const hashedPin = await bcrypt.hash(pin, 10);
+			const newUser = await prisma.user.create({ data: { name, email, pin: hashedPin, role: 'TEACHER' } });
+			return NextResponse.json({ id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }, { status: 201 });
+		} else if (role === 'admin') {
+			if (!name || !email || !password) {
+				return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+			}
+			const existing = await prisma.user.findUnique({ where: { email } });
+			if (existing) {
+				return NextResponse.json({ message: 'User with this email already exists' }, { status: 409 });
+			}
+			const hashedPassword = await bcrypt.hash(password, 10);
+			const newUser = await prisma.user.create({ data: { name, email, password: hashedPassword, role: 'ADMIN' } });
+			return NextResponse.json({ id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }, { status: 201 });
+		}
+		return NextResponse.json({ message: 'Invalid role' }, { status: 400 });
+	} catch (error: any) {
+		return NextResponse.json({ message: 'Failed to create user', error: error?.message ?? String(error) }, { status: 500 });
+	}
 } 

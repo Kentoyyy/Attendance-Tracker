@@ -1,8 +1,11 @@
 export interface Student {
-    _id: string;
-    name: string;
-    grade: number;
-    gender: 'Male' | 'Female';
+    id?: string;
+    _id?: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    grade?: number;
+    gender?: 'Male' | 'Female';
     photoUrl?: string;
     attendance?: AttendanceRecord[];
   }

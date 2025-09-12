@@ -84,6 +84,7 @@ export default function Dashboard() {
     document.title = `Grade ${selectedGrade} - Teacher's Dashboard`;
   }, [selectedGrade]);
 
+  const getId = (s: any) => String(s?.id ?? s?._id);
   const fetchData = async () => {
     if (status !== 'authenticated') return;
     setIsLoading(true);
@@ -93,11 +94,12 @@ export default function Dashboard() {
       setStudents(studentsData);
 
       if (studentsData.length > 0) {
-        const studentIds = studentsData.map((s: Student) => s._id);
+        const studentIds = studentsData.map((s: Student) => getId(s));
         const today = format(new Date(), 'yyyy-MM-dd');
         const attendanceRes = await fetch(`/api/attendance/byDate?date=${today}&studentIds=${studentIds.join(',')}`);
         const attendanceData = await attendanceRes.json();
-        setTodaysAbsences(attendanceData.filter((a: AttendanceRecord) => a.isAbsent));
+        const arr = Array.isArray(attendanceData) ? attendanceData : [];
+        setTodaysAbsences(arr.filter((a: any) => a?.isAbsent === true || a?.status === 'ABSENT'));
       } else {
         setTodaysAbsences([]);
       }

@@ -1,136 +1,106 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/app/lib/mongodb';
-import StudentModel from '@/app/models/Student';
-import Log from '@/app/models/Log';
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/app/lib/auth"
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/lib/auth';
+import prisma from '@/app/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  console.log('--- GET /api/students CALLED ---');
-  const session = await getServerSession(authOptions);
-  
-  if (!session || !session.user) {
-    console.log('API AUTH ERROR: No session or user found.');
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+	const session = await getServerSession(authOptions);
+	if (!session || !session.user) {
+		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+	}
+	try {
+		const { searchParams } = new URL(request.url);
+		const gradeId = searchParams.get('gradeId');
+		const sectionId = searchParams.get('sectionId');
+		const isActiveParam = searchParams.get('active');
 
-  console.log('Session user ID:', (session.user as { id?: string }).id);
+		const isActive = isActiveParam === null ? undefined : isActiveParam === '1';
 
-  try {
-    await connectToDatabase();
-    console.log('Database connected.');
-    const { searchParams } = new URL(request.url);
-    const grade = searchParams.get('grade');
-    const archivedParam = searchParams.get('archived');
-    console.log('Filtering for grade:', grade);
-
-    const filter: any = {
-      createdBy: (session.user as { id?: string }).id,
-      archived: archivedParam === '1' ? true : false,
-    };
-
-    if (grade) {
-      filter.grade = parseInt(grade, 10);
-    }
-    
-    console.log('Executing find with filter:', filter);
-    const students = await StudentModel.find(filter).sort({ name: 1 });
-    console.log('Students found in DB:', students.length, students);
-    
-    return NextResponse.json(students);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    console.error('API FETCH ERROR:', errorMessage);
-    return NextResponse.json({ message: 'Failed to fetch students', error: errorMessage }, { status: 500 });
-  }
+		const students = await prisma.student.findMany({
+			where: {
+				isActive,
+				enrollments: sectionId
+					? { some: { sectionId } }
+				: gradeId
+					? { some: { section: { gradeId } } }
+				: undefined,
+			},
+			include: {
+				enrollments: { include: { section: { include: { grade: true } } } },
+			},
+			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+		});
+		return NextResponse.json(students);
+	} catch (error: any) {
+		return NextResponse.json({ message: 'Failed to fetch students', error: String(error?.message ?? error) }, { status: 500 });
+	}
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session || !session.user) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+	const session = await getServerSession(authOptions);
+	if (!session || !session.user) {
+		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+	}
+	try {
+		const body = await request.json();
+		if (Array.isArray(body)) {
+			const created = await prisma.$transaction(
+				body.map((s: any) =>
+					prisma.student.create({
+						data: {
+							firstName: s.firstName ?? s.name ?? 'Unknown',
+							lastName: s.lastName ?? '',
+							lrn: s.lrn ?? null,
+							sex: s.gender ?? s.sex ?? null,
+							isActive: true,
+							enrollments: s.sectionId
+								? { create: { sectionId: s.sectionId, schoolYear: s.schoolYear ?? '2025-2026' } }
+								: undefined,
+						},
+					})
+				)
+			);
+			return NextResponse.json(created, { status: 201 });
+		}
 
-  try {
-    await connectToDatabase();
-    const body = await request.json();
-
-    if (Array.isArray(body)) {
-      // Bulk import
-      const studentsToCreate = body.map(student => ({
-        ...student,
-        createdBy: (session.user as { id?: string }).id,
-        archived: false,
-      }));
-      const createdStudents = await StudentModel.insertMany(studentsToCreate);
-      // Log each creation
-      for (const newStudent of createdStudents) {
-        await Log.create({
-          user: (session.user as { id?: string }).id,
-          action: 'create_student',
-          details: `Created student: ${newStudent.name} (ID: ${newStudent._id})`
-        });
-      }
-      return NextResponse.json(createdStudents, { status: 201 });
-    } else {
-      // Single student
-      const newStudent = await StudentModel.create({
-        ...body,
-        createdBy: (session.user as { id?: string }).id,
-        archived: false,
-      });
-      await Log.create({
-        user: (session.user as { id?: string }).id,
-        action: 'create_student',
-        details: `Created student: ${newStudent.name} (ID: ${newStudent._id})`
-      });
-      return NextResponse.json(newStudent, { status: 201 });
-    }
-  } catch (error) {
-    console.error('Failed to create student:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json({ message: 'Failed to create student', error: errorMessage }, { status: 500 });
-  }
+		type StudentCreateBody = { firstName?: string; lastName?: string; name?: string; lrn?: string; sectionId?: string; schoolYear?: string };
+		const s = body as StudentCreateBody;
+		const created = await prisma.student.create({
+			data: {
+				firstName: s.firstName ?? s.name ?? 'Unknown',
+				lastName: s.lastName ?? '',
+				lrn: s.lrn ?? null,
+				sex: (s as any).gender ?? (s as any).sex ?? null,
+				isActive: true,
+				enrollments: s.sectionId ? { create: { sectionId: s.sectionId, schoolYear: s.schoolYear ?? '2025-2026' } } : undefined,
+			},
+			include: { enrollments: true },
+		});
+		return NextResponse.json(created, { status: 201 });
+	} catch (error: any) {
+		return NextResponse.json({ message: 'Failed to create student', error: String(error?.message ?? error) }, { status: 500 });
+	}
 }
 
 export async function PATCH(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
-  try {
-    await connectToDatabase();
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    if (!id) {
-      return NextResponse.json({ message: 'Student id is required' }, { status: 400 });
-    }
-    let archived = true;
-    try {
-      const body = await request.json();
-      if (typeof body.archived === 'boolean') {
-        archived = body.archived;
-      }
-    } catch {}
-    const updated = await StudentModel.findOneAndUpdate(
-      { _id: id, createdBy: (session.user as { id?: string }).id },
-      { archived },
-      { new: true }
-    );
-    if (!updated) {
-      return NextResponse.json({ message: 'Student not found or not authorized' }, { status: 404 });
-    }
-    await Log.create({
-      user: (session.user as { id?: string }).id,
-      action: archived ? 'archive_student' : 'restore_student',
-      details: `${archived ? 'Archived' : 'Restored'} student: ${updated.name} (ID: ${updated._id})`
-    });
-    return NextResponse.json(updated);
-  } catch (error) {
-    console.error('Failed to archive/restore student:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json({ message: 'Failed to archive/restore student', error: errorMessage }, { status: 500 });
-  }
+	const session = await getServerSession(authOptions);
+	if (!session || !session.user) {
+		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+	}
+	try {
+		const { searchParams } = new URL(request.url);
+		const id = searchParams.get('id');
+		if (!id) return NextResponse.json({ message: 'Student id is required' }, { status: 400 });
+		let isActive = true;
+		try {
+			const body = await request.json();
+			if (typeof body.active === 'boolean') isActive = body.active;
+		} catch {}
+		const updated = await prisma.student.update({ where: { id }, data: { isActive } });
+		return NextResponse.json(updated);
+	} catch (error: any) {
+		return NextResponse.json({ message: 'Failed to update student', error: String(error?.message ?? error) }, { status: 500 });
+	}
 }

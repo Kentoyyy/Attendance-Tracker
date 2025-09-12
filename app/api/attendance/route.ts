@@ -1,80 +1,99 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/app/lib/mongodb';
-import Attendance from '@/app/models/Attendance';
-import Student from '@/app/models/Student';
-import Log from '@/app/models/Log';
-import { format } from 'date-fns';
+import prisma from '@/app/lib/prisma';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/lib/auth';
 
 export async function GET(req: NextRequest) {
-  try {
-    await connectToDatabase();
-    const { searchParams } = new URL(req.url);
-    const studentId = searchParams.get('studentId');
-    const month = searchParams.get('month'); // YYYY-MM
-    const isExport = searchParams.get('export');
+	try {
+		const { searchParams } = new URL(req.url);
+		const studentId = searchParams.get('studentId');
+		const month = searchParams.get('month'); // YYYY-MM
+		const isExport = searchParams.get('export');
 
-    if (isExport) {
-      // Export all absences
-      const absences = await Attendance.find({ isAbsent: true }).populate('studentId');
-      const exportData = absences.map((record: any) => ({
-        studentName: record.studentId?.name || '',
-        grade: record.studentId?.grade || '',
-        date: record.date,
-        reason: record.reason || '',
-      }));
-      return NextResponse.json(exportData);
-    }
+		if (isExport) {
+			const absences = await prisma.attendance.findMany({ where: { status: 'ABSENT' }, include: { student: true } });
+			const exportData = absences.map((r: { studentId: any; studentName: any; date: any; status: any; }) => ({
+				studentId: r.studentId,
+				studentName: r.studentName,
+				date: r.date,
+				status: r.status,
+			}));
+			return NextResponse.json(exportData);
+		}
 
-    if (!studentId || !month) {
-      return NextResponse.json({ message: 'studentId and month are required' }, { status: 400 });
-    }
-
-    const startDate = new Date(`${month}-01T00:00:00Z`);
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    const records = await Attendance.find({
-      studentId,
-      date: { $gte: startDate, $lte: endDate },
-    });
-
-    return NextResponse.json(records);
-  } catch (error) {
-    console.error('Failed to fetch attendance:', error);
-    return NextResponse.json({ message: 'Failed to fetch attendance' }, { status: 500 });
-  }
+		if (!studentId || !month) {
+			return NextResponse.json({ message: 'studentId and month are required' }, { status: 400 });
+		}
+		const startDate = new Date(`${month}-01T00:00:00Z`);
+		const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
+		const records = await prisma.attendance.findMany({
+			where: { studentId, date: { gte: startDate, lte: endDate } },
+			orderBy: { date: 'asc' },
+		});
+		return NextResponse.json(records);
+	} catch (error: any) {
+		return NextResponse.json({ message: 'Failed to fetch attendance', error: String(error?.message ?? error) }, { status: 500 });
+	}
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await connectToDatabase();
-    const body = await req.json();
-    const { studentId, date, isAbsent, reason } = body;
+	try {
+		const session = await getServerSession(authOptions);
+		if (!session || !session.user) {
+			return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+		}
+		const userId = (session.user as any).id as string;
 
-    if (!studentId || !date) {
-      return NextResponse.json({ message: 'studentId and date are required' }, { status: 400 });
-    }
+		const body = await req.json();
+		const { studentId, date, status, reason, sectionId } = body as { studentId: string; date: string; status?: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED'; reason?: string; sectionId?: string };
+		if (!studentId || !date) {
+			return NextResponse.json({ message: 'studentId and date are required' }, { status: 400 });
+		}
+		// Ensure DB has a safe default for denormalized columns (idempotent)
+		await prisma.$executeRawUnsafe(`ALTER TABLE "Attendance" ALTER COLUMN "studentName" SET DEFAULT ''`);
+		await prisma.$executeRawUnsafe(`ALTER TABLE "AbsenceNote" ALTER COLUMN "studentName" SET DEFAULT ''`);
 
-    const parsedDate = new Date(date);
+		const student = await prisma.student.findUnique({ where: { id: studentId }, select: { firstName: true, lastName: true } });
+		const studentName = student ? `${student.firstName ?? ''}${student.lastName ? ' ' + student.lastName : ''}` : '';
+		const parsedDate = new Date(date);
+		const upserted = await prisma.attendance.upsert({
+			where: { studentId_date: { studentId, date: parsedDate } },
+			update: { status: status ?? 'PRESENT', sectionIdSnapshot: sectionId ?? '' },
+			create: { studentId, date: parsedDate, status: status ?? 'PRESENT', sectionIdSnapshot: sectionId ?? '', recordedByUserId: userId },
+		});
 
-    const record = await Attendance.findOneAndUpdate(
-      { studentId, date: parsedDate },
-      { studentId, date: parsedDate, isAbsent, reason },
-      { new: true, upsert: true }
-    );
+		// Temporary: set denormalized studentName using raw SQL until Prisma client is regenerated
+		await prisma.$executeRawUnsafe(
+			'UPDATE "Attendance" SET "studentName" = $1 WHERE id = $2',
+			studentName,
+			upserted.id
+		);
+		if (reason) {
+			await prisma.absenceNote.upsert({
+				where: { attendanceId: upserted.id },
+				update: { note: reason },
+				create: { attendanceId: upserted.id, note: reason },
+			});
+			await prisma.$executeRawUnsafe(
+				'UPDATE "AbsenceNote" SET "studentName" = $1 WHERE "attendanceId" = $2',
+				studentName,
+				upserted.id
+			);
+		}
 
-    // Log the action
-    const student = await Student.findById(studentId);
-    if (student) {
-      const action = isAbsent ? 'Student Marked Absent' : 'Absence Removed';
-      const formattedDate = format(parsedDate, 'MMMM d, yyyy');
-      const reasonText = reason ? ` with reason: "${reason}"` : '';
-      const details = `${student.name} was marked ${isAbsent ? 'absent' : 'present'} on ${formattedDate}${reasonText}.`;
-      await Log.create({ action, details, grade: student.grade });
-    }
-
-    return NextResponse.json(record, { status: 200 });
-  } catch (error) {
-    console.error('Failed to update attendance:', error);
-    return NextResponse.json({ message: 'Failed to update attendance' }, { status: 500 });
-  }
+		// Log action with student name
+		await prisma.log.create({
+			data: {
+				userId,
+				action: status === 'ABSENT' ? `Student Marked Absent - ${studentName}` : `Attendance Updated - ${studentName}`,
+				entityType: 'Attendance',
+				entityId: upserted.id,
+				before: null,
+				after: { studentId, studentName, date: parsedDate, status: status ?? 'PRESENT', reason: reason ?? null },
+			}
+		});
+		return NextResponse.json(upserted, { status: 200 });
+	} catch (error: any) {
+		return NextResponse.json({ message: 'Failed to update attendance', error: String(error?.message ?? error) }, { status: 500 });
+	}
 }
