@@ -17,7 +17,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 	try {
 		const { id } = await params;
 		await prisma.attendance.deleteMany({ where: { studentId: id } });
-		await prisma.enrollment.deleteMany({ where: { studentId: id } });
 		await prisma.student.delete({ where: { id } });
 		return NextResponse.json({ message: 'Student and their attendance records deleted successfully' });
 	} catch (error) {

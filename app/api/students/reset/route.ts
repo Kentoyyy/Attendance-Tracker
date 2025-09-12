@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 				action: `Students Reset - Grade ${grade}`,
 				entityType: 'Student',
 				entityId: null,
-				before: null,
+				before: null as any,
 				after: { grade, deletedCount: deletedStudents.count },
 			}
 		});

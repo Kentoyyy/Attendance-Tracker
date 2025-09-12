@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 					action: `Teacher Account Created - ${newUser.name}`,
 					entityType: 'User',
 					entityId: newUser.id,
-					before: null,
+					before: null as any,
 					after: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
 				}
 			});
