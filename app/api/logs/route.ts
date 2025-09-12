@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 		if (!action || !details) {
 			return NextResponse.json({ error: 'Action and details are required' }, { status: 400 });
 		}
-		const newLog = await prisma.log.create({ data: { action, entityType: null, entityId: null, before: null, after: null } });
+		const newLog = await prisma.log.create({ data: { action, entityType: null, entityId: null, before: null as any, after: null as any } });
 		return NextResponse.json(newLog, { status: 201 });
 	} catch (error) {
 		console.error(error);
