@@ -95,13 +95,22 @@ export function AbsenceNotesModal({ isOpen, onOpenChange, student, record, onNot
         <div className="grid gap-4 py-4">
           <div className="grid w-full items-center gap-1.5">
             <Label htmlFor="reason">Reason for Absence</Label>
-            <Input
+            <select
               id="reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Sick, Family Emergency"
-              className="text-black bg-white"
-            />
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-black bg-white"
+            >
+              <option value="">Select a reason...</option>
+              <option value="Sick">Sick</option>
+              <option value="Family Emergency">Family Emergency</option>
+              <option value="Medical Appointment">Medical Appointment</option>
+              <option value="Personal Matter">Personal Matter</option>
+              <option value="Weather">Weather</option>
+              <option value="Transportation Issue">Transportation Issue</option>
+              <option value="Religious Holiday">Religious Holiday</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
         </div>
         <DialogFooter>

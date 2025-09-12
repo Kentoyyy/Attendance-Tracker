@@ -29,7 +29,7 @@ export default function ChangePasswordModal({ isOpen, onClose, teacher }: Change
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Check if this is a teacher (use PIN) or admin (use password)
-  const isTeacher = teacher?.role === 'teacher';
+  const isTeacher = teacher?.role?.toLowerCase() === 'teacher';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,49 +153,43 @@ export default function ChangePasswordModal({ isOpen, onClose, teacher }: Change
                 <Label htmlFor="newPin" className="text-gray-800">New PIN</Label>
                 <Input
                   id="newPin"
-                  type={showPassword ? "text" : "password"}
+                  type="text"
                   required
                   value={newPin}
-                  onChange={(e) => setNewPin(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                    if (value.length <= 6) {
+                      setNewPin(value);
+                    }
+                  }}
                   disabled={isSubmitting}
-                  className="bg-white text-gray-900 border-gray-300 pr-16"
+                  className="bg-white text-gray-900 border-gray-300 text-center text-lg tracking-widest"
                   maxLength={6}
                   minLength={6}
                   pattern="[0-9]{6}"
-                  placeholder="Enter 6-digit PIN"
+                  placeholder="000000"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-[2.3rem] transform -translate-y-1/2 text-sm font-medium text-gray-600 hover:text-gray-900"
-                  aria-label={showPassword ? "Hide PIN" : "Show PIN"}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
               </div>
               <div className="grid gap-2 relative">
                 <Label htmlFor="confirmPin" className="text-gray-800">Confirm PIN</Label>
                 <Input
                   id="confirmPin"
-                  type={showConfirmPassword ? "text" : "password"}
+                  type="text"
                   required
                   value={confirmPin}
-                  onChange={(e) => setConfirmPin(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                    if (value.length <= 6) {
+                      setConfirmPin(value);
+                    }
+                  }}
                   disabled={isSubmitting}
-                  className="bg-white text-gray-900 border-gray-300 pr-16"
+                  className="bg-white text-gray-900 border-gray-300 text-center text-lg tracking-widest"
                   maxLength={6}
                   minLength={6}
                   pattern="[0-9]{6}"
-                  placeholder="Confirm 6-digit PIN"
+                  placeholder="000000"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-[2.3rem] transform -translate-y-1/2 text-sm font-medium text-gray-600 hover:text-gray-900"
-                  aria-label={showConfirmPassword ? "Hide PIN" : "Show PIN"}
-                >
-                  {showConfirmPassword ? "Hide" : "Show"}
-                </button>
               </div>
             </>
           ) : (

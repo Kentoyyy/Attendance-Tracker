@@ -41,7 +41,7 @@ export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selec
       const response = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, grade: selectedGrade, gender }),
+        body: JSON.stringify({ name, grade: selectedGrade, sex: gender }),
       });
 
       if (response.ok) {
@@ -49,7 +49,9 @@ export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selec
         setName('');
         onStudentAdded();
       } else {
-        console.error('Failed to add student');
+        const errorData = await response.json();
+        console.error('Failed to add student:', errorData);
+        alert('Failed to add student: ' + (errorData.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error adding student:', error);

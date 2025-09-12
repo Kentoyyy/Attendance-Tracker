@@ -26,13 +26,19 @@ export const authOptions: NextAuthOptions = {
 					return { id: teacher.id, name: teacher.name, role: "teacher" } as any;
 				}
 				// Admin login with password only
-				if (credentials?.password && !credentials?.email) {
+				if (credentials?.password && !credentials?.email && !credentials?.pin) {
+					console.log('Admin login attempt with password:', credentials.password);
 					const admin = await prisma.user.findFirst({
 						where: { role: "ADMIN" },
 						select: { id: true, name: true, role: true, password: true },
 					});
-					if (!admin || !admin.password) return null;
+					console.log('Found admin:', admin ? { id: admin.id, name: admin.name, role: admin.role } : 'No admin found');
+					if (!admin || !admin.password) {
+						console.log('No admin or no password found');
+						return null;
+					}
 					const ok = await bcrypt.compare(credentials.password, admin.password);
+					console.log('Password comparison result:', ok);
 					if (!ok) return null;
 					return { id: admin.id, name: admin.name, role: "admin" } as any;
 				}

@@ -7,7 +7,7 @@ import StudentTable from '../components/StudentTable';
 import GradeSelector from '../components/GradeSelector';
 import AddStudentModal from '../components/AddStudentModal';
 import { Button } from '../components/ui/button';
-import { Plus, ChevronLeft, ChevronRight, FileText, UserX, ChevronDown, UserCircle, LogOut, Upload, Download, UserPlus } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, FileText, UserX, ChevronDown, UserCircle, LogOut, Upload, Download, UserPlus, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import Clock from '../components/Clock';
 import { Student, AttendanceRecord } from '../types';
@@ -79,6 +79,34 @@ export default function Dashboard() {
     XLSX.writeFile(workbook, 'absences.xlsx');
   };
 
+  const handleResetStudents = async () => {
+    if (!confirm('Are you sure you want to reset all students? This will remove all students from your grade.')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/students/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade: selectedGrade })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Reset result:', result);
+        alert(`Students reset successfully! ${result.deletedCount} students removed.`);
+        fetchData(); // Refresh the student list
+      } else {
+        const error = await response.json();
+        console.error('Reset error:', error);
+        alert('Failed to reset students: ' + error.message);
+      }
+    } catch (error) {
+      console.error('Error resetting students:', error);
+      alert('Error resetting students');
+    }
+  };
+
   // Update document title when grade changes
   useEffect(() => {
     document.title = `Grade ${selectedGrade} - Teacher's Dashboard`;
@@ -91,9 +119,12 @@ export default function Dashboard() {
     try {
       const studentsRes = await fetch(`/api/students?grade=${selectedGrade}${showArchived ? '&archived=1' : ''}`);
       const studentsData = await studentsRes.json();
-      setStudents(studentsData);
+      console.log('Fetched students after reset:', studentsData);
+      console.log('Is studentsData an array?', Array.isArray(studentsData));
+      console.log('StudentsData type:', typeof studentsData);
+      setStudents(Array.isArray(studentsData) ? studentsData : []);
 
-      if (studentsData.length > 0) {
+      if (Array.isArray(studentsData) && studentsData.length > 0) {
         const studentIds = studentsData.map((s: Student) => getId(s));
         const today = format(new Date(), 'yyyy-MM-dd');
         const attendanceRes = await fetch(`/api/attendance/byDate?date=${today}&studentIds=${studentIds.join(',')}`);
@@ -130,13 +161,13 @@ export default function Dashboard() {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
-  const absentMaleCount = students
-    .filter(s => s.gender === 'Male' && todaysAbsences.some(a => a.studentId === s._id))
-    .length;
+  const absentMaleCount = Array.isArray(students) 
+    ? students.filter(s => s.sex === 'Male' && todaysAbsences.some(a => a.studentId === getId(s))).length
+    : 0;
 
-  const absentFemaleCount = students
-    .filter(s => s.gender === 'Female' && todaysAbsences.some(a => a.studentId === s._id))
-    .length;
+  const absentFemaleCount = Array.isArray(students) 
+    ? students.filter(s => s.sex === 'Female' && todaysAbsences.some(a => a.studentId === getId(s))).length
+    : 0;
 
   if (status === 'loading' || !session) {
     return (
@@ -192,6 +223,7 @@ export default function Dashboard() {
                   <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100" onClick={() => { setShowFabMenu(false); setIsModalOpen(true); }}><UserPlus className="w-4 h-4" /> Add Student</button>
                   <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100" onClick={() => { setShowFabMenu(false); handleImportClick(); }}><Upload className="w-4 h-4" /> Import Students</button>
                   <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100" onClick={() => { setShowFabMenu(false); handleExportClick(); }}><Download className="w-4 h-4" /> Export Absences</button>
+                  <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 text-red-600" onClick={() => { setShowFabMenu(false); handleResetStudents(); }}><RotateCcw className="w-4 h-4" /> Reset Students</button>
                   <Link href="/dashboard/logs" className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"><FileText className="w-4 h-4" /> Action Logs</Link>
                 </div>
               )}

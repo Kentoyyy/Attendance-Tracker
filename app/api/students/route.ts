@@ -12,26 +12,23 @@ export async function GET(request: NextRequest) {
 	}
 	try {
 		const { searchParams } = new URL(request.url);
-		const gradeId = searchParams.get('gradeId');
-		const sectionId = searchParams.get('sectionId');
+		const grade = searchParams.get('grade');
 		const isActiveParam = searchParams.get('active');
+		const archived = searchParams.get('archived');
 
 		const isActive = isActiveParam === null ? undefined : isActiveParam === '1';
+		const isArchived = archived === '1';
 
 		const students = await prisma.student.findMany({
 			where: {
-				isActive,
-				enrollments: sectionId
-					? { some: { sectionId } }
-				: gradeId
-					? { some: { section: { gradeId } } }
-				: undefined,
-			},
-			include: {
-				enrollments: { include: { section: { include: { grade: true } } } },
+				isActive: isArchived ? false : isActive,
+				archived: isArchived ? true : undefined,
+				grade: grade ? parseInt(grade) : undefined,
 			},
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
 		});
+		
+		console.log(`Found ${students.length} students for grade ${grade}`);
 		return NextResponse.json(students);
 	} catch (error: any) {
 		return NextResponse.json({ message: 'Failed to fetch students', error: String(error?.message ?? error) }, { status: 500 });
@@ -41,45 +38,95 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
 	const session = await getServerSession(authOptions);
 	if (!session || !session.user) {
+		console.log('POST /api/students - Unauthorized');
 		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 	}
 	try {
 		const body = await request.json();
+		console.log('POST /api/students - Request body:', body);
 		if (Array.isArray(body)) {
 			const created = await prisma.$transaction(
-				body.map((s: any) =>
-					prisma.student.create({
+				body.map((s: any) => {
+					// Handle name field - split if it's a full name
+					let firstName = s.firstName ?? 'Unknown';
+					let lastName = s.lastName ?? '';
+					
+					if (s.name && !s.firstName && !s.lastName) {
+						const nameParts = s.name.trim().split(' ');
+						firstName = nameParts[0] || 'Unknown';
+						lastName = nameParts.slice(1).join(' ') || '';
+					}
+					
+					return prisma.student.create({
 						data: {
-							firstName: s.firstName ?? s.name ?? 'Unknown',
-							lastName: s.lastName ?? '',
+							firstName,
+							lastName,
 							lrn: s.lrn ?? null,
-							sex: s.gender ?? s.sex ?? null,
+							sex: s.sex ?? null,
+							grade: s.grade ?? 1, // Default to grade 1
 							isActive: true,
-							enrollments: s.sectionId
-								? { create: { sectionId: s.sectionId, schoolYear: s.schoolYear ?? '2025-2026' } }
-								: undefined,
 						},
-					})
-				)
+					});
+				})
 			);
+
+			// Log bulk student creation
+			const userId = (session.user as any).id;
+			await prisma.log.create({
+				data: {
+					userId,
+					action: `Bulk Student Creation - ${created.length} students added`,
+					entityType: 'Student',
+					entityId: null,
+					before: null,
+					after: { count: created.length, students: created.map((s: { id: any; firstName: any; lastName: any; sex: any; }) => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, sex: s.sex })) },
+				}
+			});
+
 			return NextResponse.json(created, { status: 201 });
 		}
 
-		type StudentCreateBody = { firstName?: string; lastName?: string; name?: string; lrn?: string; sectionId?: string; schoolYear?: string };
+		type StudentCreateBody = { firstName?: string; lastName?: string; name?: string; lrn?: string; grade?: number; sex?: string };
 		const s = body as StudentCreateBody;
+		
+		// Handle name field - split if it's a full name
+		let firstName = s.firstName ?? 'Unknown';
+		let lastName = s.lastName ?? '';
+		
+		if (s.name && !s.firstName && !s.lastName) {
+			const nameParts = s.name.trim().split(' ');
+			firstName = nameParts[0] || 'Unknown';
+			lastName = nameParts.slice(1).join(' ') || '';
+		}
+		
 		const created = await prisma.student.create({
 			data: {
-				firstName: s.firstName ?? s.name ?? 'Unknown',
-				lastName: s.lastName ?? '',
+				firstName,
+				lastName,
 				lrn: s.lrn ?? null,
-				sex: (s as any).gender ?? (s as any).sex ?? null,
+				sex: s.sex ?? null,
+				grade: s.grade ?? 1, // Default to grade 1
 				isActive: true,
-				enrollments: s.sectionId ? { create: { sectionId: s.sectionId, schoolYear: s.schoolYear ?? '2025-2026' } } : undefined,
 			},
-			include: { enrollments: true },
 		});
+
+		// Log single student creation
+		const userId = (session.user as any).id;
+		await prisma.log.create({
+			data: {
+				userId,
+				action: `Student Added - ${created.firstName} ${created.lastName}`,
+				entityType: 'Student',
+				entityId: created.id,
+				before: null,
+				after: { id: created.id, name: `${created.firstName} ${created.lastName}`, lrn: created.lrn, grade: created.grade, sex: created.sex },
+			}
+		});
+
+		console.log('POST /api/students - Student created successfully:', created);
 		return NextResponse.json(created, { status: 201 });
 	} catch (error: any) {
+		console.error('POST /api/students - Error creating student:', error);
 		return NextResponse.json({ message: 'Failed to create student', error: String(error?.message ?? error) }, { status: 500 });
 	}
 }

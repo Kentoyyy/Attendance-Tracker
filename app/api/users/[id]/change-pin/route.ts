@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/lib/auth';
 import prisma from '@/app/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 export async function PUT(
 	request: NextRequest,
@@ -24,7 +25,9 @@ export async function PUT(
 		if (!user) return NextResponse.json({ message: 'User not found' }, { status: 404 });
 		if (user.role !== 'TEACHER') return NextResponse.json({ message: 'This endpoint is only for teachers' }, { status: 400 });
 
-		const updated = await prisma.user.update({ where: { id }, data: { pin: newPin } });
+		// Hash the new PIN before storing
+		const hashedPin = await bcrypt.hash(newPin, 12);
+		const updated = await prisma.user.update({ where: { id }, data: { pin: hashedPin } });
 		return NextResponse.json({ message: 'Teacher PIN updated successfully', user: { id: updated.id, name: updated.name } });
 	} catch (error) {
 		return NextResponse.json({ message: 'Failed to change teacher PIN', error: String((error as any)?.message ?? error) }, { status: 500 });

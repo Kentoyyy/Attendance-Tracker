@@ -5,7 +5,7 @@ export interface Student {
     firstName?: string;
     lastName?: string;
     grade?: number;
-    gender?: 'Male' | 'Female';
+    sex?: 'Male' | 'Female';
     photoUrl?: string;
     attendance?: AttendanceRecord[];
   }

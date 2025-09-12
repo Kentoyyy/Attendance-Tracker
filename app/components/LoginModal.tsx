@@ -86,7 +86,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         <DialogHeader>
           <DialogTitle className="text-2xl text-gray-900">Login</DialogTitle>
           <DialogDescription className="text-gray-600">
-            Enter your credentials to access your account.
+            Enter your PIN to access your account.
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2 mb-4">
@@ -100,25 +100,22 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <Label htmlFor="pin" className="text-gray-800">PIN</Label>
                 <Input
                   id="pin"
-                  type={showPassword ? "text" : "password"}
+                  type="password"
                   required
                   value={pin}
-                  onChange={(e) => setPin(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                    if (value.length <= 6) {
+                      setPin(value);
+                    }
+                  }}
                   disabled={isLoading}
-                  className="bg-white text-gray-900 border-gray-300 pr-16"
+                  className="bg-white text-gray-900 border-gray-300 text-center text-lg tracking-widest"
                   maxLength={6}
                   minLength={6}
                   pattern="[0-9]{6}"
-                  placeholder="Enter your 6-digit PIN"
+                  placeholder="••••••"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-[2.3rem] transform -translate-y-1/2 text-sm font-medium text-gray-600 hover:text-gray-900"
-                  aria-label={showPassword ? "Hide PIN" : "Show PIN"}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
               </div>
             </>
           ) : (

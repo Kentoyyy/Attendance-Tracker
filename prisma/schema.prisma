@@ -36,36 +36,9 @@ model User {
   // Relations
   logs                  Log[]
   recordedAttendance    Attendance[]   @relation("recordedBy")
-  advisedSections       Section[]      @relation("adviserOfSection")
   approvedAbsenceNotes  AbsenceNote[]  @relation("approvedByUser")
 }
 
-model Grade {
-  id           String    @id @default(cuid())
-  name         String    @unique // e.g., "Grade 2"
-  levelNumber  Int
-  sections     Section[]
-
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-}
-
-model Section {
-  id          String       @id @default(cuid())
-  name        String
-  grade       Grade        @relation(fields: [gradeId], references: [id])
-  gradeId     String
-  adviser     User?        @relation("adviserOfSection", fields: [adviserId], references: [id])
-  adviserId   String?
-
-  enrollments Enrollment[]
-
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@unique([gradeId, name])
-  @@index([gradeId])
-}
 
 model Student {
   id          String     @id @default(cuid())
@@ -74,27 +47,14 @@ model Student {
   lastName    String
   sex         String?
   birthdate   DateTime?
+  grade       Int        // Simple grade field (1, 2, 3)
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  enrollments Enrollment[]
   attendance  Attendance[]
 }
 
-model Enrollment {
-  id          String   @id @default(cuid())
-  student     Student  @relation(fields: [studentId], references: [id])
-  studentId   String
-  section     Section  @relation(fields: [sectionId], references: [id])
-  sectionId   String
-  schoolYear  String   // e.g., "2025-2026"
-  status      String   @default("ENROLLED")
-  createdAt   DateTime @default(now())
-
-  @@unique([studentId, sectionId, schoolYear])
-  @@index([sectionId])
-}
 
 model Attendance {
   id                 String            @id @default(cuid())

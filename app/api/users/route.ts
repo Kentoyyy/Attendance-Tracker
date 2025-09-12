@@ -44,6 +44,20 @@ export async function POST(request: NextRequest) {
 			}
 			const hashedPin = await bcrypt.hash(pin, 10);
 			const newUser = await prisma.user.create({ data: { name, email, pin: hashedPin, role: 'TEACHER' } });
+
+			// Log teacher creation
+			const adminUserId = (session.user as any).id;
+			await prisma.log.create({
+				data: {
+					userId: adminUserId,
+					action: `Teacher Account Created - ${newUser.name}`,
+					entityType: 'User',
+					entityId: newUser.id,
+					before: null,
+					after: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
+				}
+			});
+
 			return NextResponse.json({ id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }, { status: 201 });
 		} else if (role === 'admin') {
 			if (!name || !email || !password) {

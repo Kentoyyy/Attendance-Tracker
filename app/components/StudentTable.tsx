@@ -95,8 +95,8 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
   );
   // Sort: males first, then females
   filteredStudents = filteredStudents.sort((a, b) => {
-    if (a.gender === b.gender) return 0;
-    if (a.gender === 'Male') return -1;
+    if (a.sex === b.sex) return 0;
+    if (a.sex === 'Male') return -1;
     return 1;
   });
   const totalPages = Math.ceil(filteredStudents.length / studentsPerPage);
@@ -336,9 +336,9 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
                       {absentCount > 0 && (
                         <span className="ml-2 text-xs text-red-600">({absentCount})</span>
                       )}
-                      {student.gender && (
-                        <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}`}>
-                          {student.gender}
+                      {student.sex && (
+                        <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.sex === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}`}>
+                          {student.sex}
                         </span>
                       )}
                     </div>

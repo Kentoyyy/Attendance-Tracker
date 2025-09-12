@@ -49,36 +49,33 @@ export async function POST(req: NextRequest) {
 		if (!studentId || !date) {
 			return NextResponse.json({ message: 'studentId and date are required' }, { status: 400 });
 		}
-		// Ensure DB has a safe default for denormalized columns (idempotent)
-		await prisma.$executeRawUnsafe(`ALTER TABLE "Attendance" ALTER COLUMN "studentName" SET DEFAULT ''`);
-		await prisma.$executeRawUnsafe(`ALTER TABLE "AbsenceNote" ALTER COLUMN "studentName" SET DEFAULT ''`);
 
-		const student = await prisma.student.findUnique({ where: { id: studentId }, select: { firstName: true, lastName: true } });
+		const student = await prisma.student.findUnique({ where: { id: studentId }, select: { firstName: true, lastName: true, sex: true } });
 		const studentName = student ? `${student.firstName ?? ''}${student.lastName ? ' ' + student.lastName : ''}` : '';
+		const studentGender = student?.sex || null;
 		const parsedDate = new Date(date);
 		const upserted = await prisma.attendance.upsert({
 			where: { studentId_date: { studentId, date: parsedDate } },
-			update: { status: status ?? 'PRESENT', sectionIdSnapshot: sectionId ?? '' },
-			create: { studentId, date: parsedDate, status: status ?? 'PRESENT', sectionIdSnapshot: sectionId ?? '', recordedByUserId: userId },
+			update: { 
+				status: status ?? 'PRESENT', 
+				sectionIdSnapshot: sectionId ?? '',
+				studentName: studentName
+			},
+			create: { 
+				studentId, 
+				date: parsedDate, 
+				status: status ?? 'PRESENT', 
+				sectionIdSnapshot: sectionId ?? '', 
+				recordedByUserId: userId,
+				studentName: studentName
+			},
 		});
-
-		// Temporary: set denormalized studentName using raw SQL until Prisma client is regenerated
-		await prisma.$executeRawUnsafe(
-			'UPDATE "Attendance" SET "studentName" = $1 WHERE id = $2',
-			studentName,
-			upserted.id
-		);
 		if (reason) {
 			await prisma.absenceNote.upsert({
 				where: { attendanceId: upserted.id },
-				update: { note: reason },
-				create: { attendanceId: upserted.id, note: reason },
+				update: { note: reason, studentName: studentName },
+				create: { attendanceId: upserted.id, note: reason, studentName: studentName },
 			});
-			await prisma.$executeRawUnsafe(
-				'UPDATE "AbsenceNote" SET "studentName" = $1 WHERE "attendanceId" = $2',
-				studentName,
-				upserted.id
-			);
 		}
 
 		// Log action with student name
@@ -89,7 +86,7 @@ export async function POST(req: NextRequest) {
 				entityType: 'Attendance',
 				entityId: upserted.id,
 				before: null,
-				after: { studentId, studentName, date: parsedDate, status: status ?? 'PRESENT', reason: reason ?? null },
+				after: { studentId, studentName, date: parsedDate, status: status ?? 'PRESENT', reason: reason ?? null, sex: studentGender },
 			}
 		});
 		return NextResponse.json(upserted, { status: 200 });
