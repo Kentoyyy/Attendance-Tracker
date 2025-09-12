@@ -11,8 +11,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 	try {
 		const { id } = await params;
 		if (!id) return NextResponse.json({ message: 'User id is required' }, { status: 400 });
-		// Clean up relations (teacher advisedSections etc.)
-		await prisma.section.updateMany({ where: { adviserId: id }, data: { adviserId: null } });
+		// Clean up relations (attendance records)
 		await prisma.attendance.updateMany({ where: { recordedByUserId: id }, data: { recordedByUserId: id } });
 		await prisma.log.deleteMany({ where: { userId: id } });
 		await prisma.user.delete({ where: { id } });

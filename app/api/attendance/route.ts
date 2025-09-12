@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 				action: status === 'ABSENT' ? `Student Marked Absent - ${studentName}` : `Attendance Updated - ${studentName}`,
 				entityType: 'Attendance',
 				entityId: upserted.id,
-				before: null,
+				before: null as any,
 				after: { studentId, studentName, date: parsedDate, status: status ?? 'PRESENT', reason: reason ?? null, sex: studentGender },
 			}
 		});

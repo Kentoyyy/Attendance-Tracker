@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
 		const students = await prisma.student.findMany({
 			where: {
 				isActive: isArchived ? false : isActive,
-				archived: isArchived ? true : undefined,
 				grade: grade ? parseInt(grade) : undefined,
 			},
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -78,7 +77,7 @@ export async function POST(request: NextRequest) {
 					action: `Bulk Student Creation - ${created.length} students added`,
 					entityType: 'Student',
 					entityId: null,
-					before: null,
+					before: null as any,
 					after: { count: created.length, students: created.map((s: { id: any; firstName: any; lastName: any; sex: any; }) => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, sex: s.sex })) },
 				}
 			});
@@ -118,7 +117,7 @@ export async function POST(request: NextRequest) {
 				action: `Student Added - ${created.firstName} ${created.lastName}`,
 				entityType: 'Student',
 				entityId: created.id,
-				before: null,
+				before: null as any,
 				after: { id: created.id, name: `${created.firstName} ${created.lastName}`, lrn: created.lrn, grade: created.grade, sex: created.sex },
 			}
 		});
@@ -140,12 +139,33 @@ export async function PATCH(request: NextRequest) {
 		const { searchParams } = new URL(request.url);
 		const id = searchParams.get('id');
 		if (!id) return NextResponse.json({ message: 'Student id is required' }, { status: 400 });
+		
 		let isActive = true;
 		try {
 			const body = await request.json();
-			if (typeof body.active === 'boolean') isActive = body.active;
+			// Handle both 'active' and 'archived' fields for backward compatibility
+			if (typeof body.active === 'boolean') {
+				isActive = body.active;
+			} else if (typeof body.archived === 'boolean') {
+				isActive = !body.archived; // archived = true means isActive = false
+			}
 		} catch {}
+		
 		const updated = await prisma.student.update({ where: { id }, data: { isActive } });
+		
+		// Log the archive/unarchive action
+		const userId = (session.user as any).id;
+		await prisma.log.create({
+			data: {
+				userId,
+				action: isActive ? `Student Unarchived - ${updated.firstName} ${updated.lastName}` : `Student Archived - ${updated.firstName} ${updated.lastName}`,
+				entityType: 'Student',
+				entityId: updated.id,
+				before: null as any,
+				after: { id: updated.id, name: `${updated.firstName} ${updated.lastName}`, isActive: updated.isActive },
+			}
+		});
+		
 		return NextResponse.json(updated);
 	} catch (error: any) {
 		return NextResponse.json({ message: 'Failed to update student', error: String(error?.message ?? error) }, { status: 500 });
