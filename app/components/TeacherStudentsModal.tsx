@@ -49,10 +49,13 @@ export default function TeacherStudentsModal({ isOpen, onClose, teacher }: Teach
   // Group students by grade
   const studentsByGrade: { [grade: number]: Student[] } = {};
   students.forEach(student => {
-    if (!studentsByGrade[student.grade]) {
-      studentsByGrade[student.grade] = [];
+    const grade = student.grade;
+    if (grade !== undefined && !studentsByGrade[grade]) {
+      studentsByGrade[grade] = [];
     }
-    studentsByGrade[student.grade].push(student);
+    if (grade !== undefined) {
+      studentsByGrade[grade].push(student);
+    }
   });
 
   const sortedGrades = Object.keys(studentsByGrade)
