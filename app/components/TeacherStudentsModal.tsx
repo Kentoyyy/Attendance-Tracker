@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import { Student } from '../models/Student';
+import { Student } from '../types';
 
 interface TeacherStudentsModalProps {
   isOpen: boolean;
@@ -85,16 +85,20 @@ export default function TeacherStudentsModal({ isOpen, onClose, teacher }: Teach
                   sortedGrades.map(grade => {
                     // Sort within grade: males first, then females, both alphabetically
                     const studentsInGrade = [...studentsByGrade[grade]].sort((a, b) => {
-                      if (a.gender !== b.gender) {
-                        return a.gender === 'Male' ? -1 : 1;
+                      if (a.sex !== b.sex) {
+                        return a.sex === 'Male' ? -1 : 1;
                       }
-                      return a.name.localeCompare(b.name);
+                      const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim();
+                      const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim();
+                      return nameA.localeCompare(nameB);
                     });
                     return studentsInGrade.map(student => (
-                      <tr key={student._id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
+                      <tr key={student.id || student._id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {`${student.firstName || ''} ${student.lastName || ''}`.trim() || student.name || 'Unknown'}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.grade}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.gender}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.sex}</td>
                       </tr>
                     ));
                   })
