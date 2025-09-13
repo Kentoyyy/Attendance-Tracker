@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { teacherId: string } }
+  { params }: { params: Promise<{ teacherId: string }> }
 ) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user) {
@@ -15,7 +15,7 @@ export async function GET(
   }
 
   try {
-    const { teacherId } = params;
+    const { teacherId } = await params;
 
     // Find students by getting unique students from attendance records recorded by this teacher
     const attendanceRecords = await prisma.attendance.findMany({
