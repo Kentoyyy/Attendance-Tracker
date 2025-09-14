@@ -20,6 +20,7 @@ model User {
   pin                  String?
   logs                 Log[]
   students             Student[]
+  grades               Grade[]
   recordedAttendance   Attendance[]  @relation("recordedBy")
   approvedAbsenceNotes AbsenceNote[] @relation("approvedByUser")
 }
@@ -31,6 +32,8 @@ model Grade {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  teacherId String
+  teacher   User      @relation(fields: [teacherId], references: [id])
 }
 
 model Student {

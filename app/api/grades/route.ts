@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/lib/auth';
 import { prisma } from '@/app/lib/prisma';
 
 // GET /api/grades - Get all grades
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
     const grades = await prisma.grade.findMany({
-      where: { isActive: true },
+      where: { 
+        isActive: true,
+        teacherId: (session.user as any).id // Filter by current teacher
+      },
       orderBy: { number: 'asc' },
       select: {
         id: true,
@@ -29,6 +39,11 @@ export async function GET() {
 // POST /api/grades - Create a new grade
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { name, number } = body;
 
@@ -39,10 +54,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if grade name or number already exists (only active grades)
+    // Check if grade name or number already exists (only active grades for this teacher)
     const existingActiveGrade = await prisma.grade.findFirst({
       where: {
         isActive: true,
+        teacherId: (session.user as any).id,
         OR: [
           { name: name.trim() },
           { number: parseInt(number) }
@@ -61,6 +77,7 @@ export async function POST(request: NextRequest) {
     const existingInactiveGrade = await prisma.grade.findFirst({
       where: {
         isActive: false,
+        teacherId: (session.user as any).id,
         OR: [
           { name: name.trim() },
           { number: parseInt(number) }
@@ -77,6 +94,7 @@ export async function POST(request: NextRequest) {
           name: name.trim(),
           number: parseInt(number),
           isActive: true,
+          teacherId: (session.user as any).id,
           updatedAt: new Date()
         },
         select: {
@@ -92,7 +110,8 @@ export async function POST(request: NextRequest) {
       grade = await prisma.grade.create({
         data: {
           name: name.trim(),
-          number: parseInt(number)
+          number: parseInt(number),
+          teacherId: (session.user as any).id
         },
         select: {
           id: true,
@@ -117,6 +136,11 @@ export async function POST(request: NextRequest) {
 // DELETE /api/grades - Delete a grade
 export async function DELETE(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const gradeId = searchParams.get('id');
 
@@ -152,9 +176,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Check if this is the last grade
+    // Check if this is the last grade for this teacher
     const totalGrades = await prisma.grade.count({
-      where: { isActive: true }
+      where: { 
+        isActive: true,
+        teacherId: (session.user as any).id
+      }
     });
 
     if (totalGrades <= 1) {
