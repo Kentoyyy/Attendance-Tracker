@@ -30,7 +30,6 @@ model Grade {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  students  Student[]
 }
 
 model Student {
@@ -44,8 +43,6 @@ model Student {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   grade      Int
-  gradeId    String?
-  gradeRef   Grade?       @relation(fields: [gradeId], references: [id])
   attendance Attendance[]
 }
 
