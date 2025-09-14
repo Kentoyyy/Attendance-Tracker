@@ -24,10 +24,9 @@ export async function GET(request: NextRequest) {
 				isActive: isArchived ? false : (isActive ?? true),
 				grade: grade ? parseInt(grade) : undefined,
 				teacherId: (session.user as any).id, // Filter by current teacher
-			},
+			} as any,
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
 		});
-		
 		console.log(`Found ${students.length} students for grade ${grade}`);
 		return NextResponse.json(students);
 	} catch (error: any) {
@@ -66,7 +65,7 @@ export async function POST(request: NextRequest) {
 							grade: s.grade ?? 1, // Default to grade 1
 							isActive: true,
 							teacherId: (session.user as any).id, // Associate with current teacher
-						},
+						} as any,
 					});
 				})
 			);
@@ -109,7 +108,7 @@ export async function POST(request: NextRequest) {
 				grade: s.grade ?? 1, // Default to grade 1
 				isActive: true,
 				teacherId: (session.user as any).id, // Associate with current teacher
-			},
+			} as any,
 		});
 
 		// Log single student creation
