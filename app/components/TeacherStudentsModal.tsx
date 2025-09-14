@@ -26,11 +26,14 @@ export default function TeacherStudentsModal({ isOpen, onClose, teacher }: Teach
       if (!teacher) return;
       setIsLoading(true);
       try {
+        console.log('Fetching students for teacher:', teacher._id, teacher.name);
         const res = await fetch(`/api/students/byTeacher/${teacher._id}`);
         if (res.ok) {
           const data = await res.json();
+          console.log('Received students data:', data);
           setStudents(data);
         } else {
+          console.error('Failed to fetch students, response not ok:', res.status);
           setStudents([]);
         }
       } catch (error) {
@@ -41,7 +44,7 @@ export default function TeacherStudentsModal({ isOpen, onClose, teacher }: Teach
       }
     };
 
-    if (isOpen) {
+    if (isOpen && teacher) {
       fetchStudents();
     }
   }, [isOpen, teacher]);
@@ -68,8 +71,18 @@ export default function TeacherStudentsModal({ isOpen, onClose, teacher }: Teach
         <DialogHeader>
           <DialogTitle className="text-gray-900">Students Managed by {teacher?.name}</DialogTitle>
           <DialogDescription className="text-gray-600">
-            A list of all students created by this teacher.
+            Students that this teacher has recorded attendance for.
           </DialogDescription>
+          {students.length > 0 && (
+            <div className="mt-2 text-sm text-gray-500">
+              Total: {students.length} students | 
+              {Object.entries(studentsByGrade).map(([grade, gradeStudents]) => (
+                <span key={grade} className="ml-2">
+                  Grade {grade}: {gradeStudents.length}
+                </span>
+              ))}
+            </div>
+          )}
         </DialogHeader>
         <div className="mt-4 max-h-[60vh] overflow-y-auto">
            <div className="border rounded-md">

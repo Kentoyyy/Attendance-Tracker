@@ -1,13 +1,99 @@
-// Prisma schema for Attendance Tracker (PostgreSQL)
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
   relationMode = "prisma"
+}
+
+model User {
+  id                   String        @id @default(cuid())
+  email                String        @unique
+  name                 String
+  password             String?
+  role                 UserRole      @default(TEACHER)
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  pin                  String?
+  logs                 Log[]
+  recordedAttendance   Attendance[]  @relation("recordedBy")
+  approvedAbsenceNotes AbsenceNote[] @relation("approvedByUser")
+}
+
+model Grade {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  number    Int       @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  students  Student[]
+}
+
+model Student {
+  id         String       @id @default(cuid())
+  lrn        String?      @unique
+  firstName  String
+  lastName   String
+  sex        String?
+  birthdate  DateTime?
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  grade      Int
+  gradeId    String?
+  gradeRef   Grade?       @relation(fields: [gradeId], references: [id])
+  attendance Attendance[]
+}
+
+model Attendance {
+  id                String           @id @default(cuid())
+  studentId         String
+  date              DateTime
+  status            AttendanceStatus
+  timeIn            DateTime?
+  timeOut           DateTime?
+  recordedByUserId  String
+  sectionIdSnapshot String
+  createdAt         DateTime         @default(now())
+  studentName       String           @default("")
+  student           Student          @relation(fields: [studentId], references: [id])
+  recordedBy        User             @relation("recordedBy", fields: [recordedByUserId], references: [id])
+  note              AbsenceNote?
+
+  @@unique([studentId, date])
+  @@index([date])
+  @@index([sectionIdSnapshot, date])
+}
+
+model AbsenceNote {
+  id               String     @id @default(cuid())
+  attendanceId     String     @unique
+  note             String
+  attachmentUrl    String?
+  approvedByUserId String?
+  approvedAt       DateTime?
+  createdAt        DateTime   @default(now())
+  studentName      String     @default("")
+  attendance       Attendance @relation(fields: [attendanceId], references: [id])
+  approvedBy       User?      @relation("approvedByUser", fields: [approvedByUserId], references: [id])
+}
+
+model Log {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  before     Json?
+  after      Json?
+  user       User?    @relation(fields: [userId], references: [id])
 }
 
 enum UserRole {
@@ -21,89 +107,4 @@ enum AttendanceStatus {
   ABSENT
   LATE
   EXCUSED
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String?
-  pin       String?
-  role      UserRole @default(TEACHER)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  logs                  Log[]
-  recordedAttendance    Attendance[]   @relation("recordedBy")
-  approvedAbsenceNotes  AbsenceNote[]  @relation("approvedByUser")
-}
-
-
-model Student {
-  id          String     @id @default(cuid())
-  lrn         String?    @unique
-  firstName   String
-  lastName    String
-  sex         String?
-  birthdate   DateTime?
-  grade       Int        // Simple grade field (1, 2, 3)
-  isActive    Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  attendance  Attendance[]
-}
-
-
-model Attendance {
-  id                 String            @id @default(cuid())
-  student            Student           @relation(fields: [studentId], references: [id])
-  studentId          String
-  studentName        String            // denormalized for quick viewing
-  date               DateTime
-  status             AttendanceStatus
-  timeIn             DateTime?
-  timeOut            DateTime?
-  recordedBy         User              @relation("recordedBy", fields: [recordedByUserId], references: [id])
-  recordedByUserId   String
-  sectionIdSnapshot  String            // denormalized for quick filtering
-
-  note         AbsenceNote?
-
-  createdAt    DateTime           @default(now())
-
-  @@unique([studentId, date])
-  @@index([date])
-  @@index([sectionIdSnapshot, date])
-}
-
-model AbsenceNote {
-  id               String     @id @default(cuid())
-  attendance       Attendance @relation(fields: [attendanceId], references: [id])
-  attendanceId     String     @unique
-  note             String
-  studentName      String     // duplicate for reports
-  attachmentUrl    String?
-  approvedBy       User?      @relation("approvedByUser", fields: [approvedByUserId], references: [id])
-  approvedByUserId String?
-  approvedAt       DateTime?
-  createdAt        DateTime   @default(now())
-}
-
-model Log {
-  id         String   @id @default(cuid())
-  user       User?    @relation(fields: [userId], references: [id])
-  userId     String?
-  action     String
-  entityType String?
-  entityId   String?
-  ip         String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
-
-  // optionally store JSON snapshots
-  before     Json?
-  after      Json?
 }

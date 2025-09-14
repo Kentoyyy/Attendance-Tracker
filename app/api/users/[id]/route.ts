@@ -3,6 +3,25 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/lib/auth';
 import prisma from '@/app/lib/prisma';
 
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+	const session = await getServerSession(authOptions);
+	if (!session || !session.user || (session.user as { role?: string }).role !== 'admin') {
+		return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+	}
+	try {
+		const { id } = await params;
+		if (!id) return NextResponse.json({ message: 'User id is required' }, { status: 400 });
+		const user = await prisma.user.findUnique({ 
+			where: { id },
+			select: { id: true, name: true, email: true, role: true, createdAt: true }
+		});
+		if (!user) return NextResponse.json({ message: 'User not found' }, { status: 404 });
+		return NextResponse.json(user);
+	} catch (error) {
+		return NextResponse.json({ message: 'Failed to fetch user', error }, { status: 500 });
+	}
+}
+
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	const session = await getServerSession(authOptions);
 	if (!session || !session.user || (session.user as { role?: string }).role !== 'admin') {

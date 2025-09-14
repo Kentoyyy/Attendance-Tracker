@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
 		const students = await prisma.student.findMany({
 			where: {
-				isActive: isArchived ? false : isActive,
+				isActive: isArchived ? false : (isActive ?? true),
 				grade: grade ? parseInt(grade) : undefined,
 			},
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],

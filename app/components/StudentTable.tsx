@@ -8,14 +8,15 @@ import { AbsenceNotesModal } from './AbsenceNotesModal';
 import { Button } from './ui/button';
 import { Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useTheme, getThemeColors } from '../context/ThemeProvider';
 
 interface StudentTableProps {
   students: Student[];
   isLoading: boolean;
   currentMonth: Date;
   onAttendanceUpdate?: () => void;
-  showArchived: boolean;
-  setShowArchived: (v: boolean) => void;
+  selectedGrade: string;
+  setSelectedGrade: (grade: string) => void;
 }
 
 const getMonthDates = (month: Date) => {
@@ -24,7 +25,7 @@ const getMonthDates = (month: Date) => {
   return Array.from({ length: dayCount }, (_, i) => new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1));
 };
 
-export default function StudentTable({ students, isLoading, currentMonth, onAttendanceUpdate, showArchived, setShowArchived }: StudentTableProps) {
+export default function StudentTable({ students, isLoading, currentMonth, onAttendanceUpdate, selectedGrade, setSelectedGrade }: StudentTableProps) {
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord[]>>({});
   const [hoveredStudent, setHoveredStudent] = useState<Student | null>(null);
   const [hoveredAbsences, setHoveredAbsences] = useState<AttendanceRecord[]>([]);
@@ -34,6 +35,8 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
   const [isNoteModalOpen, setNoteModalOpen] = useState(false);
   const [selectedStudentForNote, setSelectedStudentForNote] = useState<Student | null>(null);
   const [selectedRecordForNote, setSelectedRecordForNote] = useState<AttendanceRecord | null>(null);
+  const { isDark } = useTheme();
+  const colors = getThemeColors(isDark);
 
   const dates = getMonthDates(currentMonth);
 
@@ -55,44 +58,9 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
   const [page, setPage] = useState(1);
   const studentsPerPage = 8;
 
-  // Selection state for archiving
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  // Move paginatedStudents declaration above this block to avoid use-before-declaration
-  // allSelected now checks if all paginatedStudents are selected
-  let allSelected = false;
-  // paginatedStudents will be defined later, so we use a function to check after its declaration
   const getStudentId = (s: any) => String((s as any).id ?? (s as any)._id);
-  const isAllSelected = (students: Student[]) =>
-    students.length > 0 && students.every(s => selectedIds.includes(getStudentId(s)));
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds(ids => ids.filter(id => !paginatedStudents.some(s => getStudentId(s) === id)));
-    } else {
-      setSelectedIds(ids => Array.from(new Set([...ids, ...paginatedStudents.map(s => getStudentId(s))])));
-    }
-  };
-  const toggleSelect = (id: string) => {
-    setSelectedIds(ids => ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id]);
-  };
-  const handleArchiveSelected = async () => {
-    for (const id of selectedIds) {
-      await fetch(`/api/students?id=${id}`, { method: 'PATCH' });
-    }
-    setSelectedIds([]);
-    onAttendanceUpdate?.();
-  };
-  const handleRestoreSelected = async () => {
-    for (const id of selectedIds) {
-      await fetch(`/api/students?id=${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archived: false }) });
-    }
-    setSelectedIds([]);
-    onAttendanceUpdate?.();
-  };
-
-  // Robust filter: treat missing 'archived' as false (active)
-  let filteredStudents = students.filter(s =>
-    showArchived ? (s as any).archived === true : (s as any).archived !== true
-  );
+  // Filter students - only show active students
+  let filteredStudents = students.filter(s => (s as any).isActive === true);
   // Sort: males first, then females
   filteredStudents = filteredStudents.sort((a, b) => {
     if (a.sex === b.sex) return 0;
@@ -130,8 +98,7 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
   useEffect(() => {
     // Reset to first page if students list changes
     setPage(1);
-    setSelectedIds([]);
-  }, [students, showArchived]);
+  }, [students]);
 
   const handleDayClick = (student: Student, date: Date, isCurrentlyAbsent: boolean) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -290,17 +257,11 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
 
   return (
     <div className="w-full relative">
-      <div className="mb-2 text-sm text-gray-500 font-medium">
-        Viewing: {showArchived ? 'Archived Students' : 'Active Students'}
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto border rounded-lg max-w-full" style={{ borderColor: colors.border }}>
+        <table className="min-w-full divide-y text-xs sm:text-sm md:text-base" style={{ backgroundColor: colors.cardBackground, borderColor: colors.border }}>
+          <thead style={{ backgroundColor: colors.headerBackground }}>
             <tr>
-              <th className="px-2 py-3">
-                <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-              </th>
-              <th scope="col" className="sticky left-0 bg-gray-50 px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider z-10">
+              <th scope="col" className="sticky left-0 px-2 sm:px-3 md:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider z-10 min-w-[80px] sm:min-w-[120px]" style={{ backgroundColor: colors.headerBackground, color: colors.textSecondary }}>
                 Name
               </th>
               {dates.map(date => {
@@ -308,36 +269,46 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
                 const dateStrHead = format(date, 'yyyy-MM-dd');
                 const isAnyAbsent = absentDatesSet.has(dateStrHead);
                 return (
-                  <th key={date.toString()} scope="col" className={`px-2 py-3 text-center text-xs font-medium uppercase tracking-wider ${isCurrentDay ? 'bg-blue-100 text-blue-800' : isAnyAbsent ? 'bg-red-50 text-red-700' : 'text-gray-500'}`}>
-                    <div className={`font-normal ${isCurrentDay ? 'text-blue-600' : isAnyAbsent ? 'text-red-700' : 'text-gray-400'}`}>{format(date, 'eee')}</div>
-                    <div className={`mt-1 font-semibold ${isCurrentDay ? 'bg-blue-600 text-white rounded-full h-6 w-6 flex items-center justify-center mx-auto' : isAnyAbsent ? 'bg-red-600 text-white rounded-full h-6 w-6 flex items-center justify-center mx-auto' : ''}`}>{getDate(date)}</div>
+                  <th key={date.toString()} scope="col" className="px-1 sm:px-2 py-3 text-center text-xs font-medium uppercase tracking-wider min-w-[2rem] sm:min-w-[2.5rem] md:min-w-[3rem]" style={{ 
+                    backgroundColor: isCurrentDay ? colors.primary : (isAnyAbsent ? colors.error : colors.headerBackground),
+                    color: isCurrentDay ? '#ffffff' : (isAnyAbsent ? '#ffffff' : colors.textSecondary)
+                  }}>
+                    <div className="font-normal" style={{ color: isCurrentDay ? '#ffffff' : (isAnyAbsent ? '#ffffff' : colors.textMuted) }}>{format(date, 'eee')}</div>
+                    <div className={`mt-1 font-semibold ${isCurrentDay ? 'rounded-full h-6 w-6 flex items-center justify-center mx-auto' : isAnyAbsent ? 'rounded-full h-6 w-6 flex items-center justify-center mx-auto' : ''}`} style={{
+                      backgroundColor: isCurrentDay ? '#ffffff' : (isAnyAbsent ? '#ffffff' : 'transparent'),
+                      color: isCurrentDay ? colors.primary : (isAnyAbsent ? colors.error : colors.text)
+                    }}>{getDate(date)}</div>
                   </th>
                 );
               })}
-              <th scope="col" className="sticky right-0 bg-gray-50 px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-l border-gray-200">
+              <th scope="col" className="sticky right-0 px-3 sm:px-6 py-3 text-center text-xs font-medium uppercase tracking-wider border-l" style={{ 
+                backgroundColor: colors.headerBackground, 
+                color: colors.textSecondary,
+                borderColor: colors.border
+              }}>
                 Absences
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y" style={{ backgroundColor: colors.cardBackground, borderColor: colors.border }}>
             {paginatedStudents.map(student => {
               const sid = getStudentId(student);
               const studentAttendance = attendance[sid] || [];
               const absentCount = studentAttendance.filter(r => r.isAbsent).length;
               
               return (
-                <tr key={sid}>
-                  <td className="px-2 py-4">
-                    <input type="checkbox" checked={selectedIds.includes(sid)} onChange={() => toggleSelect(sid)} />
-                  </td>
-                  <td className="sticky left-0 bg-white px-3 sm:px-6 py-4 whitespace-nowrap z-10">
+                <tr key={sid} className="hover:opacity-80 transition-opacity" style={{ backgroundColor: colors.cardBackground }}>
+                  <td className="sticky left-0 px-2 sm:px-3 md:px-6 py-4 whitespace-nowrap z-10" style={{ backgroundColor: colors.cardBackground }}>
                     <div className="flex items-center">
-                      <div className="font-medium text-gray-900 text-sm sm:text-base">{student.name ?? `${student.firstName ?? ''}${student.lastName ? ' ' + student.lastName : ''}`}</div>
+                      <div className="font-medium text-sm sm:text-base" style={{ color: colors.text }}>{student.name ?? `${student.firstName ?? ''}${student.lastName ? ' ' + student.lastName : ''}`}</div>
                       {absentCount > 0 && (
-                        <span className="ml-2 text-xs text-red-600">({absentCount})</span>
+                        <span className="ml-2 text-xs" style={{ color: colors.error }}>({absentCount})</span>
                       )}
                       {student.sex && (
-                        <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.sex === 'Male' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}`}>
+                        <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full" style={{
+                          backgroundColor: student.sex === 'Male' ? '#dbeafe' : '#fce7f3',
+                          color: student.sex === 'Male' ? '#1e40af' : '#be185d'
+                        }}>
                           {student.sex}
                         </span>
                       )}
@@ -348,20 +319,27 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
                     const record = studentAttendance.find(r => format(new Date((r as any).date), 'yyyy-MM-dd') === dateStr);
                     const isAbsent = (record as any)?.isAbsent === true || (record as any)?.status === 'ABSENT';
                     const isCurrentDay = isToday(date);
+                    const isFutureDate = date > new Date();
 
                     return (
-                      <td key={dateStr} className={`px-2 py-2 whitespace-nowrap text-center ${isCurrentDay ? 'bg-blue-50' : ''}`}>
+                      <td key={dateStr} className="px-1 sm:px-2 py-2 whitespace-nowrap text-center" style={{ 
+                        backgroundColor: isCurrentDay ? (isDark ? colors.hover : colors.lightButton) : 'transparent'
+                      }}>
                         <button
                           onClick={() => handleDayClick(student, date, isAbsent)}
                           onMouseEnter={(e) => isAbsent && handleAbsenceHover(e, record)}
                           onMouseLeave={handleAbsenceLeave}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors duration-200
-                            ${isAbsent 
-                              ? 'bg-red-100 text-red-800 font-bold hover:bg-red-200 hover:ring-2 hover:ring-red-300' 
-                              : 'text-gray-500 hover:bg-gray-100 hover:ring-2 hover:ring-gray-300'
-                            }`
+                          className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs transition-colors duration-200 hover:opacity-80"
+                          style={{
+                            backgroundColor: isAbsent ? colors.error : 'transparent',
+                            color: isAbsent ? '#ffffff' : colors.textMuted,
+                            border: isAbsent ? 'none' : (isFutureDate ? `1px dashed ${colors.border}` : `1px solid ${colors.border}`),
+                            opacity: isFutureDate && !isAbsent ? 0.7 : 1
+                          }}
+                          title={isAbsent 
+                            ? (record?.reason ? `Absent: ${record.reason}` : 'Absent') 
+                            : `Mark absent${isFutureDate ? ' (Future)' : ''}`
                           }
-                          title={isAbsent ? (record?.reason ? `Absent: ${record.reason}` : 'Absent') : 'Mark absent'}
                           aria-label={`Mark day ${getDate(date)} for ${student.name}`}
                         >
                           {getDate(date)}
@@ -369,9 +347,13 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
                       </td>
                     );
                   })}
-                  <td className="sticky right-0 bg-white px-3 sm:px-6 py-4 whitespace-nowrap text-center border-l border-gray-200">
+                  <td className="sticky right-0 px-3 sm:px-6 py-4 whitespace-nowrap text-center border-l" style={{ 
+                    backgroundColor: colors.cardBackground,
+                    borderColor: colors.border
+                  }}>
                     <div 
-                      className="relative font-semibold text-lg text-gray-800 inline-block cursor-pointer"
+                      className="relative font-semibold text-lg inline-block cursor-pointer hover:opacity-80 transition-opacity"
+                      style={{ color: colors.text }}
                       onMouseEnter={(e) => handleAbsenceCountHover(e, absentCount)}
                       onMouseLeave={handleAbsenceCountLeave}
                     >
@@ -439,50 +421,37 @@ export default function StudentTable({ students, isLoading, currentMonth, onAtte
       />
 
       {/* Pagination Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4">
-         {showArchived ? (
-           <Button
-             variant="outline"
-             size="sm"
-             className="bg-white text-black border border-gray-200 hover:bg-gray-100"
-             onClick={handleRestoreSelected}
-             disabled={selectedIds.length === 0}
-           >
-             Restore Selected
-           </Button>
-         ) : (
-           <Button
-             variant="outline"
-             size="sm"
-             className="bg-white text-black border border-gray-200 hover:bg-gray-100"
-             onClick={handleArchiveSelected}
-             disabled={selectedIds.length === 0}
-           >
-             Archive Selected
-           </Button>
-         )}
-        <div className="flex justify-center items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 mt-4">
           <Button
             variant="outline"
             size="sm"
-            className="bg-white text-black border border-gray-200 hover:bg-gray-100"
+            className="hover:opacity-80 transition-opacity"
+            style={{ 
+              backgroundColor: colors.lightButton,
+              color: colors.text,
+              borderColor: colors.border
+            }}
             onClick={() => setPage(page - 1)}
             disabled={page === 1}
           >
             Previous
           </Button>
-          <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
+          <span className="text-xs sm:text-sm" style={{ color: colors.textSecondary }}>Page {page} of {totalPages}</span>
           <Button
             variant="outline"
             size="sm"
-            className="bg-white text-black border border-gray-200 hover:bg-gray-100"
+            className="hover:opacity-80 transition-opacity"
+            style={{ 
+              backgroundColor: colors.lightButton,
+              color: colors.text,
+              borderColor: colors.border
+            }}
             onClick={() => setPage(page + 1)}
             disabled={page === totalPages}
           >
             Next
           </Button>
         </div>
-      </div>
     </div>
   );
 } 

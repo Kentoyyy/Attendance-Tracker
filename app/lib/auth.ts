@@ -16,14 +16,24 @@ export const authOptions: NextAuthOptions = {
 			async authorize(credentials) {
 				// Teacher login with PIN only (hashed validation)
 				if (credentials?.pin && !credentials?.name) {
-					const teacher = await prisma.user.findFirst({
+					console.log('Teacher login attempt with PIN');
+					const teachers = await prisma.user.findMany({
 						where: { role: "TEACHER" },
-						select: { id: true, name: true, role: true, pin: true },
+						select: { id: true, name: true, role: true, pin: true, email: true },
 					});
-					if (!teacher || !teacher.pin) return null;
-					const ok = await bcrypt.compare(credentials.pin, teacher.pin);
-					if (!ok) return null;
-					return { id: teacher.id, name: teacher.name, role: "teacher" } as any;
+					console.log('Found teachers:', teachers.length);
+					
+					for (const teacher of teachers) {
+						if (teacher.pin) {
+							const ok = await bcrypt.compare(credentials.pin, teacher.pin);
+							console.log(`PIN comparison for ${teacher.name}:`, ok);
+							if (ok) {
+								return { id: teacher.id, name: teacher.name, role: "teacher", email: teacher.email } as any;
+							}
+						}
+					}
+					console.log('No matching teacher PIN found');
+					return null;
 				}
 				// Admin login with password only
 				if (credentials?.password && !credentials?.email && !credentials?.pin) {

@@ -17,10 +17,10 @@ interface AddStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStudentAdded: () => void;
-  selectedGrade?: number;
+  selectedGrade?: string;
 }
 
-export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selectedGrade = 1 }: AddStudentModalProps) {
+export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selectedGrade = 'Grade 1' }: AddStudentModalProps) {
   const [name, setName] = useState('');
   const [gender, setGender] = useState('Female');
   const [isSaving, setIsSaving] = useState(false);
@@ -38,10 +38,17 @@ export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selec
 
     setIsSaving(true);
     try {
+      // Extract grade number from grade string
+      const getGradeNumber = (gradeString: string): number => {
+        const match = gradeString.match(/\d+/);
+        return match ? parseInt(match[0]) : 1; // Default to 1 if no number found
+      };
+
+      const gradeNumber = getGradeNumber(selectedGrade);
       const response = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, grade: selectedGrade, sex: gender }),
+        body: JSON.stringify({ name, grade: gradeNumber, sex: gender }),
       });
 
       if (response.ok) {
@@ -67,7 +74,7 @@ export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selec
           <DialogHeader>
             <DialogTitle className="text-gray-900">Add New Student</DialogTitle>
             <DialogDescription className="text-gray-600">
-              Enter the name of the new student for Grade {selectedGrade}.
+              Enter the name of the new student for {selectedGrade}.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
