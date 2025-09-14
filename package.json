@@ -20,7 +20,7 @@
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "date-fns": "^4.1.0",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "lucide-react": "^0.519.0",
     "next": "15.3.4",
     "next-auth": "^4.24.11",

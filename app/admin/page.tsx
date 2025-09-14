@@ -488,7 +488,7 @@ export default function AdminDashboard() {
             </Card>
 
             <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-8">
-              {/* Left Column: Create Teacher Form */}
+          {/* Left Column: Create Teacher Form */}
               <div className="xl:col-span-2 order-2 xl:order-1">
                 <Card style={{ backgroundColor: colors.cardBackground, borderColor: colors.border }}>
                   <CardHeader>
@@ -502,7 +502,7 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleCreateTeacher} className="grid gap-y-6">
-                      <div>
+              <div>
                         <Label htmlFor="name" style={{ color: colors.text }}>Full Name</Label>
                         <Input 
                           id="name" 
@@ -517,8 +517,8 @@ export default function AdminDashboard() {
                             borderColor: colors.border 
                           }} 
                         />
-                      </div>
-                      <div>
+              </div>
+              <div>
                         <Label htmlFor="email" style={{ color: colors.text }}>Email</Label>
                         <Input 
                           id="email" 
@@ -535,8 +535,8 @@ export default function AdminDashboard() {
                           }} 
                           placeholder="teacher@email.com" 
                         />
-                      </div>
-                      <div>
+              </div>
+              <div>
                         <Label htmlFor="pin" style={{ color: colors.text }}>PIN</Label>
                         <Input 
                           id="pin" 
@@ -556,7 +556,7 @@ export default function AdminDashboard() {
                           pattern="[0-9]{6}" 
                           placeholder="6-digit PIN" 
                         />
-                      </div>
+              </div>
                       {submitMessage && (
                         <p 
                           className="text-sm" 
@@ -573,14 +573,14 @@ export default function AdminDashboard() {
                         className="w-full justify-center border-0 hover:opacity-90 transition-opacity"
                         style={{ backgroundColor: colors.primary, color: '#ffffff' }}
                       >
-                        {isSubmitting ? 'Creating Account...' : 'Create Account'}
-                      </Button>
-                    </form>
+                {isSubmitting ? 'Creating Account...' : 'Create Account'}
+              </Button>
+            </form>
                   </CardContent>
                 </Card>
-              </div>
+          </div>
 
-              {/* Right Column: Teacher List */}
+          {/* Right Column: Teacher List */}
               <div className="xl:col-span-3 order-1 xl:order-2">
                 <Card style={{ backgroundColor: colors.cardBackground, borderColor: colors.border }}>
                   <CardHeader>
@@ -687,10 +687,10 @@ export default function AdminDashboard() {
                             <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Name</th>
                             <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Email</th>
                             <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Actions</th>
-                          </tr>
-                        </thead>
+                        </tr>
+                      </thead>
                         <tbody className="divide-y" style={{ backgroundColor: colors.cardBackground, borderColor: colors.border }}>
-                          {isLoading.teachers ? (
+                        {isLoading.teachers ? (
                             <tr>
                               <td colSpan={3} className="text-center p-6 text-sm" style={{ color: colors.textMuted }}>
                                 <div className="flex items-center justify-center gap-2">
@@ -771,10 +771,10 @@ export default function AdminDashboard() {
                                 No teacher accounts found.
                               </td>
                             </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1072,7 +1072,7 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+        </div>
         )}
       </main>
 

@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
 							sex: s.sex ?? null,
 							grade: s.grade ?? 1, // Default to grade 1
 							isActive: true,
+							// Don't set gradeId for now - we'll use the grade number
 						},
 					});
 				})
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
 				sex: s.sex ?? null,
 				grade: s.grade ?? 1, // Default to grade 1
 				isActive: true,
+				// Don't set gradeId for now - we'll use the grade number
 			},
 		});
 
