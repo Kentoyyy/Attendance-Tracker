@@ -164,9 +164,13 @@ export default function Dashboard() {
         const gradesResponse = await fetch('/api/grades');
         if (gradesResponse.ok) {
           const grades = await gradesResponse.json();
+          console.log('✅ Refreshed grades from database:', grades);
           const gradeNames = grades.map((grade: any) => grade.name);
           setAvailableGrades(gradeNames);
           setSelectedGrade(newGrade);
+          console.log('✅ Updated available grades:', gradeNames);
+        } else {
+          console.error('❌ Failed to refresh grades list');
         }
         
         setIsAddGradeModalOpen(false);
@@ -313,12 +317,15 @@ export default function Dashboard() {
           console.log('✅ Loaded grades from database:', grades);
           
           const gradeNames = grades.map((grade: any) => grade.name);
+          console.log('✅ Mapped grade names:', gradeNames);
           setAvailableGrades(gradeNames);
           
           // Set selected grade to first available grade
           if (gradeNames.length > 0) {
             setSelectedGrade(gradeNames[0]);
             console.log('✅ Set selected grade to:', gradeNames[0]);
+          } else {
+            console.log('⚠️ No grades found in database');
           }
         } else {
           console.error('❌ Failed to load grades from database');

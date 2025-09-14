@@ -12,12 +12,7 @@ export async function GET() {
         name: true,
         number: true,
         isActive: true,
-        createdAt: true,
-        _count: {
-          select: {
-            students: true
-          }
-        }
+        createdAt: true
       }
     });
 
