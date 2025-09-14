@@ -19,6 +19,7 @@ model User {
   updatedAt            DateTime      @updatedAt
   pin                  String?
   logs                 Log[]
+  students             Student[]
   recordedAttendance   Attendance[]  @relation("recordedBy")
   approvedAbsenceNotes AbsenceNote[] @relation("approvedByUser")
 }
@@ -43,6 +44,8 @@ model Student {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   grade      Int
+  teacherId  String
+  teacher    User         @relation(fields: [teacherId], references: [id])
   attendance Attendance[]
 }
 

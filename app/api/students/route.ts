@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
 			where: {
 				isActive: isArchived ? false : (isActive ?? true),
 				grade: grade ? parseInt(grade) : undefined,
+				teacherId: (session.user as any).id, // Filter by current teacher
 			},
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
 		});
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
 							sex: s.sex ?? null,
 							grade: s.grade ?? 1, // Default to grade 1
 							isActive: true,
-							// Don't set gradeId for now - we'll use the grade number
+							teacherId: (session.user as any).id, // Associate with current teacher
 						},
 					});
 				})
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
 				sex: s.sex ?? null,
 				grade: s.grade ?? 1, // Default to grade 1
 				isActive: true,
-				// Don't set gradeId for now - we'll use the grade number
+				teacherId: (session.user as any).id, // Associate with current teacher
 			},
 		});
 
