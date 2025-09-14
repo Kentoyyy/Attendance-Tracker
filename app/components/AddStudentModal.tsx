@@ -45,10 +45,21 @@ export default function AddStudentModal({ isOpen, onClose, onStudentAdded, selec
       };
 
       const gradeNumber = getGradeNumber(selectedGrade);
+      
+      // Split name into firstName and lastName
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0] || 'Unknown';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       const response = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, grade: gradeNumber, sex: gender }),
+        body: JSON.stringify({ 
+          firstName, 
+          lastName, 
+          grade: gradeNumber, 
+          sex: gender 
+        }),
       });
 
       if (response.ok) {

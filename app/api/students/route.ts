@@ -126,7 +126,17 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json(created, { status: 201 });
 	} catch (error: any) {
 		console.error('POST /api/students - Error creating student:', error);
-		return NextResponse.json({ message: 'Failed to create student', error: String(error?.message ?? error) }, { status: 500 });
+		console.error('Error details:', {
+			message: error?.message,
+			code: error?.code,
+			meta: error?.meta,
+			stack: error?.stack
+		});
+		return NextResponse.json({ 
+			message: 'Failed to create student', 
+			error: String(error?.message ?? error),
+			details: error?.code || 'Unknown error'
+		}, { status: 500 });
 	}
 }
 
