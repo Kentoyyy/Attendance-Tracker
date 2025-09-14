@@ -236,7 +236,6 @@ export default function ResponsiveStudentTable({
                                 ? colors.hoverSecondary 
                                 : colors.hover,
                           color: isAbsent || isCurrentDay ? '#ffffff' : colors.text,
-                          ringColor: colors.primary,
                           opacity: isFutureDate && !isAbsent ? 0.7 : 1,
                           border: isFutureDate && !isAbsent ? `1px dashed ${colors.border}` : 'none'
                         }}
@@ -422,7 +421,6 @@ export default function ResponsiveStudentTable({
                                 ? colors.hoverSecondary 
                                 : colors.hover,
                           color: isAbsent || isCurrentDay ? '#ffffff' : colors.text,
-                          ringColor: colors.primary,
                           opacity: isFutureDate && !isAbsent ? 0.7 : 1,
                           border: isFutureDate && !isAbsent ? `1px dashed ${colors.border}` : 'none'
                         }}

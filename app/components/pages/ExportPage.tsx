@@ -77,14 +77,13 @@ export default function ExportPage({ students, selectedGrade }: ExportPageProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
             onClick={() => setExportType('students')}
-            className="p-4 rounded-lg border-2 transition-all duration-200"
+            className={`p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer ${
+              exportType !== 'students' ? 'hover:opacity-80' : ''
+            }`}
             style={{
               borderColor: exportType === 'students' ? colors.primary : colors.border,
               backgroundColor: exportType === 'students' ? 'rgba(0, 98, 57, 0.1)' : colors.hover
             }}
-            className={`cursor-pointer transition-all duration-200 ${
-              exportType !== 'students' ? 'hover:opacity-80' : ''
-            }`}
           >
             <div className="flex items-center gap-3">
               <Users className="w-6 h-6" style={{ color: exportType === 'students' ? colors.primary : colors.textSecondary }} />
@@ -97,14 +96,13 @@ export default function ExportPage({ students, selectedGrade }: ExportPageProps)
 
           <button
             onClick={() => setExportType('attendance')}
-            className="p-4 rounded-lg border-2 transition-all duration-200"
+            className={`p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer ${
+              exportType !== 'attendance' ? 'hover:opacity-80' : ''
+            }`}
             style={{
               borderColor: exportType === 'attendance' ? colors.primary : colors.border,
               backgroundColor: exportType === 'attendance' ? 'rgba(0, 98, 57, 0.1)' : colors.hover
             }}
-            className={`cursor-pointer transition-all duration-200 ${
-              exportType !== 'attendance' ? 'hover:opacity-80' : ''
-            }`}
           >
             <div className="flex items-center gap-3">
               <Calendar className="w-6 h-6" style={{ color: exportType === 'attendance' ? colors.primary : colors.textSecondary }} />
@@ -133,8 +131,7 @@ export default function ExportPage({ students, selectedGrade }: ExportPageProps)
         <Button
           onClick={handleExportClick}
           disabled={isExporting || students.length === 0}
-          className="px-8 py-3 border-0"
-          className="border-0 hover:opacity-90 transition-opacity"
+          className="px-8 py-3 border-0 hover:opacity-90 transition-opacity"
           style={{ backgroundColor: colors.primary, color: colors.text }}
         >
           {isExporting ? (
