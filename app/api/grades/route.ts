@@ -128,8 +128,21 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if grade has students
+    // First get the grade number from the gradeId
+    const grade = await prisma.grade.findUnique({
+      where: { id: gradeId },
+      select: { number: true }
+    });
+    
+    if (!grade) {
+      return NextResponse.json(
+        { error: 'Grade not found' },
+        { status: 404 }
+      );
+    }
+    
     const studentCount = await prisma.student.count({
-      where: { gradeId: gradeId }
+      where: { grade: grade.number }
     });
 
     if (studentCount > 0) {
