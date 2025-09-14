@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
   const [isAddGradeModalOpen, setIsAddGradeModalOpen] = useState(false);
   const [newGradeName, setNewGradeName] = useState('');
+  const [selectedGradeOption, setSelectedGradeOption] = useState('');
   const [isLoadingGrades, setIsLoadingGrades] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
@@ -128,17 +129,17 @@ export default function Dashboard() {
   };
 
   const handleAddGrade = async () => {
-    if (!newGradeName.trim()) {
-      alert('Please enter a grade name');
+    if (!selectedGradeOption) {
+      alert('Please select a grade');
       return;
     }
 
-    if (availableGrades.includes(newGradeName.trim())) {
+    if (availableGrades.includes(selectedGradeOption)) {
       alert('This grade already exists');
       return;
     }
 
-    const newGrade = newGradeName.trim();
+    const newGrade = selectedGradeOption;
     console.log('➕ Adding new grade to database:', newGrade);
     
     try {
@@ -175,6 +176,7 @@ export default function Dashboard() {
         
         setIsAddGradeModalOpen(false);
         setNewGradeName('');
+        setSelectedGradeOption('');
         setConfirmModal({
           isOpen: true,
           title: 'Success',
@@ -301,6 +303,7 @@ export default function Dashboard() {
     if (currentPage !== 'dashboard' && isAddGradeModalOpen) {
       setIsAddGradeModalOpen(false);
       setNewGradeName('');
+      setSelectedGradeOption('');
     }
   }, [currentPage, isAddGradeModalOpen]);
 
@@ -753,6 +756,7 @@ export default function Dashboard() {
                 onClick={() => {
                   setIsAddGradeModalOpen(false);
                   setNewGradeName('');
+                  setSelectedGradeOption('');
                 }}
                 className="p-1 rounded-md transition-all duration-200 cursor-pointer hover:opacity-80"
                 style={{ 
@@ -765,33 +769,54 @@ export default function Dashboard() {
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2" style={{ color: colors.textSecondary }}>
-                Grade Name
+                Select Grade
               </label>
-              <input
-                type="text"
-                value={newGradeName}
-                onChange={(e) => setNewGradeName(e.target.value)}
-                placeholder="e.g., Senior High, College, Grade 4"
-                className="w-full p-3 rounded-md focus:outline-none"
-                style={{ 
+              {[
+                'Kindergarten',
+                'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
+                'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12',
+                'Senior High School', 'College'
+              ].filter(grade => !availableGrades.includes(grade)).length === 0 ? (
+                <div className="w-full p-3 rounded-md text-center" style={{ 
                   backgroundColor: colors.background,
                   borderColor: colors.border,
-                  color: colors.text,
+                  color: colors.textMuted,
                   borderWidth: '2px',
                   borderStyle: 'solid'
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAddGrade();
-                  }
-                }}
-              />
+                }}>
+                  All available grades have been added!
+                </div>
+              ) : (
+                <select
+                  value={selectedGradeOption}
+                  onChange={(e) => setSelectedGradeOption(e.target.value)}
+                  className="w-full p-3 rounded-md focus:outline-none"
+                  style={{ 
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    color: colors.text,
+                    borderWidth: '2px',
+                    borderStyle: 'solid'
+                  }}
+                >
+                  <option value="">Choose a grade...</option>
+                  {[
+                    'Kindergarten',
+                    'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
+                    'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12',
+                    'Senior High School', 'College'
+                  ].filter(grade => !availableGrades.includes(grade)).map(grade => (
+                    <option key={grade} value={grade}>{grade}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => {
                   setIsAddGradeModalOpen(false);
                   setNewGradeName('');
+                  setSelectedGradeOption('');
                 }}
                 className="px-4 py-2 rounded-md transition-all duration-200 cursor-pointer hover:opacity-80"
                 style={{ 
@@ -803,7 +828,13 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={handleAddGrade}
-                className="px-4 py-2 rounded-md transition-all duration-200 cursor-pointer hover:opacity-80"
+                disabled={[
+                  'Kindergarten',
+                  'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
+                  'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12',
+                  'Senior High School', 'College'
+                ].filter(grade => !availableGrades.includes(grade)).length === 0}
+                className="px-4 py-2 rounded-md transition-all duration-200 cursor-pointer hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ 
                   backgroundColor: colors.primary,
                   color: '#ffffff'
