@@ -15,3 +15,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Grade_number_key" ON "Grade"("number");
 
 -- Verify the table was created
 SELECT * FROM "Grade";
+
+
+
+
+
